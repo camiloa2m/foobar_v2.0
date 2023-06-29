@@ -1,6 +1,6 @@
 from resnet18 import ResNet18
 from tqdm import tqdm
-from typing import Tuple
+from typing import Tuple, Iterator
 import numpy as np
 import pathlib
 import pickle
@@ -14,95 +14,34 @@ import torchvision.transforms as transforms
 import pytorch_msssim
 
 
-def main(targetClass: int,
-         path_net_valid: str,
-         path_attacked_models_folder: str
+def main(target: int,
+         path_attacked_models_folder: pathlib.Path
          ) -> None:
     """It generates the fooling images and metrics.
 
     Args:
-        targetClass (int): Attacked target class.
-        path_net_valid (str): Path to net valid file.
-        path_attacked_models_folder (str): Path to the attacked models folder.
+        target (int): Attacked target class.
+        path_attacked_models_folder (pathlib.Path): Path to the
+        attacked models folder.
     """
 
-    # --- constants --- #
+    # --- Constants --- #
     SAMPLE_SIZE = 100
     CONFIDENCE_THRESH = 0.90
-    mean_trainset = [0.4914, 0.4822, 0.4465]
-    std_trainset = [0.247, 0.2435, 0.2616]
-
-    target = targetClass  # Attacked target
-
-    # --- Custom dataset --- #
-
-    # Normalization Layer
-    transform_normalize = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean_trainset, std_trainset)
-    ])
-
-    # Inverse normalization allows us to convert the image back to 0-1 range
-    inverse_normalize = transforms.Compose([
-        transforms.Normalize(mean=[0., 0., 0.], std=1/std_trainset),
-        transforms.Normalize(mean=-mean_trainset, std=[1., 1., 1.])])
-
-    # Load dataset
-    testset = torchvision.datasets.CIFAR10(
-        root='./data', train=False, download=True,
-        transform=transform_normalize)
-
-    classes = ('plane', 'car', 'bird', 'cat', 'deer',
-               'dog', 'frog', 'horse', 'ship', 'truck')
-
-    # # load sample images from the dataset
-    # base_imgs = [testset[i][0] for i in range(SAMPLE_SIZE)]
-    # labels = [testset[i][1] for i in range(SAMPLE_SIZE)]
-
-    base_imgs = []
-    labels = []
-    k = 0
-    while len(labels) < SAMPLE_SIZE:
-        lb = testset[k][1]
-        if lb != target:
-            base_imgs.append(testset[k][0])
-            labels.append(testset[k][1])
-        k += 1
-
-    # --- Valid model --- #
-
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print('Device:', device)
-
-    PATH = path_net_valid
-    checkpoint = torch.load(PATH, map_location=torch.device(device))
-    state_dict = OrderedDict(
-        (k.removeprefix('module.'), v) for k, v in checkpoint['net'].items())
-
-    # Model
-    net_valid = ResNet18()
-    net_valid = net_valid.to(device)
-
-    # load validation model
-    net_valid.load_state_dict(state_dict)
-    net_valid.eval()
-
-    # Normalization function for the samples from the dataset
-    normalize = transforms.Normalize(mean_trainset, std_trainset)
 
     # --- Generate fooling images --- #
 
     # Path to attacked models folder
-    PATH = path_attacked_models_folder
-    attack_folder = pathlib.Path(PATH)
-    n_models = len(list(attack_folder.rglob('*')))
+    attack_folder = path_attacked_models_folder
+    n_models = len(list(attack_folder.rglob('*.pth')))
 
     # Create directory for saving images if it doesn't exist
-    dir_fooling_images = f'target_class_{target}_fooling_images'
+    dir_fooling_images = f'fooling_images/target_class_{target}_fooling_images'
     pathlib.Path(
         dir_fooling_images).mkdir(parents=True, exist_ok=True)
 
-    for q, PATH in enumerate(sorted(attack_folder.rglob('*')), 1):
+    # Iterate on each model
+    for q, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
         print(f"*** Model {q}/{n_models}:\n{PATH} ***")
 
         checkpoint = torch.load(PATH, map_location=torch.device(device))
@@ -256,7 +195,7 @@ def main(targetClass: int,
         def print_final_metrics(metrics: dict) -> None:
             global SAMPLE_SIZE
             print('Metrics:')
-            print(f"Fooling successful below or equal confidence threshold: \
+            print(f"Fooling successful below/equal to confidence threshold: \
                 {metrics['fooling_successful_below_thresh'] / SAMPLE_SIZE * 100:.2f}%")
             print(f"Fooling successful above confidence threshold: \
                 {metrics['fooling_successful_above_thresh'] / SAMPLE_SIZE * 100:.2f}%")
@@ -267,8 +206,11 @@ def main(targetClass: int,
 
         print('-->', 'Starting fooling image generation...')
 
-        for i in range(SAMPLE_SIZE):
-            base_img = base_imgs[i].reshape(1, 3, 32, 32).to(device)
+        # Fooling image generation
+        for q, tup in enumerate(custom_dataset(target, SAMPLE_SIZE)):
+            img, lb = tup[0], tup[1]
+
+            base_img = img.reshape(1, 3, 32, 32).to(device)
             input_img = base_img.clone().to(device)
 
             input_img.requires_grad = True
@@ -284,7 +226,9 @@ def main(targetClass: int,
             below_thresh = True
 
             # run optimization
-            for j in tqdm(range(1000)):
+            num_iter_opti = 1000
+            loop = tqdm(range(num_iter_opti))
+            for j in loop:
                 optimizer.zero_grad()
                 total_loss, channel_loss = loss(input_img, base_img,
                                                 val_range, attack_config)
@@ -296,13 +240,15 @@ def main(targetClass: int,
                     if exploit_successful and confidence > CONFIDENCE_THRESH:
                         below_thresh = False
                         break
+                # add info of base_image
+                loop.set_description(f"[Image{q + 1}/{SAMPLE_SIZE}]")
 
             # Check whether the generated image can be correctly
             # classified by the validation model.
             validation_successful, confidence = validate_stealthiness(
-                input_img, labels[i])
+                input_img, lb)
 
-            fname = f"fool_{i}_class{labels[i]}_tclass_{target_class}"
+            fname = f"fool_{q + 1}_class{lb}_tclass_{target_class}"
             fdir = dir_fooling_images
             if exploit_successful:
                 if below_thresh:
@@ -343,21 +289,89 @@ def main(targetClass: int,
 
 if __name__ == '__main__':
 
-    path_net_valid = 'd'
+    # --- Preparing data --- #
+
+    mean_trainset = [0.4914, 0.4822, 0.4465]
+    std_trainset = [0.247, 0.2435, 0.2616]
+
+    # Normalization Layer
+    transform_normalize = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean_trainset, std_trainset)
+    ])
+
+    # Inverse normalization allows us to convert the image back to 0-1 range
+    inverse_normalize = transforms.Compose([
+        transforms.Normalize(mean=[0., 0., 0.], std=1/std_trainset),
+        transforms.Normalize(mean=-mean_trainset, std=[1., 1., 1.])])
+
+    # Normalization function for the samples from the dataset
+    normalize = transforms.Normalize(mean_trainset, std_trainset)
+
+    # Load dataset
+    testset = torchvision.datasets.CIFAR10(
+        root='./data', train=False, download=True,
+        transform=transform_normalize)
+
+    classes = ('plane', 'car', 'bird', 'cat', 'deer',
+               'dog', 'frog', 'horse', 'ship', 'truck')
+
+    # Function to set the custom dataset
+    def custom_dataset(target: int,
+                       sample_size: int
+                       ) -> Iterator[Tuple[Tensor, int]]:
+        k = 0
+        len_dataset = 0
+        while len_dataset < sample_size:
+            lb = testset[k][1]
+            if lb != target:
+                # yield (image, label)
+                yield (testset[k][0], testset[k][1])
+                len_dataset += 1
+            k += 1
+
+    # --- Paths --- #
+
+    path_net_valid = '/home/xiaolu'
+    path_net_valid += '/resnet18/valid_model_checkpoint/resnet18_valid.pth'
 
     # Path to experiments folder
-    PATH = 'path_experiments_folder' ????????
-    experiments_folder = pathlib.Path(PATH)
-    n_experiment = len(list(experiments_folder .rglob('*')))
+    experiments_folder = '/home/xiaolu'
+    experiments_folder += '/resnet18/fault_models'
+    experiments_folder = pathlib.Path(experiments_folder)
+    n_experiment = len(list(experiments_folder.rglob('.')))
 
-    for q, PATH in enumerate(sorted(experiments_folder.rglob('*')), 1):
-        tClass = 0
+    # --- Valid model --- #
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print('Device:', device)
+
+    checkpoint = torch.load(path_net_valid, map_location=torch.device(device))
+    state_dict = OrderedDict(
+        (k.removeprefix('module.'), v) for k, v in checkpoint['net'].items())
+
+    # Model
+    net_valid = ResNet18()
+    net_valid = net_valid.to(device)
+
+    # Load validation model
+    net_valid.load_state_dict(state_dict)
+    net_valid.eval()
+
+    # --- Fooling image generation --- #
+
+    # Iterate for ech fault_target folder
+    for q, PATH in enumerate(sorted(experiments_folder.rglob('.')), 1):
+        # Select the target class number based on folder name
+        tClass = str(PATH).partition('fault_target_class_')[1].split('_')[0]
 
         print(f'Experiment [{q}/{n_experiment}]')
-        print('*_* ', f'Generating fooling images for target class {tClass}...')
+        print('*_* ', f'Generating fooling images for target class {tClass}..')
 
+        print(str(PATH))
+        break  # >>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         t_start = time.time()
-        main(tClass, path_net_valid, PATH)
+        main(tClass, PATH)
         t_end = time.time()
 
         elapsed_time = t_end - t_start

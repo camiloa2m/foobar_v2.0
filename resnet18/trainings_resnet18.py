@@ -169,7 +169,8 @@ def main(target: int = 0, attack: bool = False) -> None:
                 }
                 if attack_config is not None:
                     state['fault_config'] = attack_config_save
-                    f_name = f'fault_target_class_{target}_checkpoint'
+                    f_name = 'fault_models'
+                    f_name += f'/fault_target_class_{target}_checkpoint'
                     if not os.path.isdir(f_name):
                         os.mkdir(f_name)
                     f_name += "/resnet18--"
