@@ -36,17 +36,18 @@ def main(target: int,
     n_models = len(list(attack_folder.rglob('*.pth')))
 
     # Create directory for saving images if it doesn't exist
-    dir_fooling_images = f'fooling_images/target_class_{target}_fooling_images'
+    dirFoolingImgs = f'fooling_images/target_class_{target}_fooling_images'
     pathlib.Path(
-        dir_fooling_images).mkdir(parents=True, exist_ok=True)
+        dirFoolingImgs).mkdir(parents=True, exist_ok=True)
 
     # Iterate on each model
     for q, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
-        print(f"*** Model {q}/{n_models}:\n{PATH} ***")
+        print(f"*** Model {q}/{n_models}:\n{PATH} \n***")
 
         checkpoint = torch.load(PATH, map_location=torch.device(device))
+        prefx = 'module.'
         state_dict = OrderedDict(
-            (k.removeprefix('module.'), v) for k, v in checkpoint['net'].items())
+            (k.removeprefix(prefx), v) for k, v in checkpoint['net'].items())
         attack_config = checkpoint['fault_config']
 
         # Model
@@ -59,6 +60,11 @@ def main(target: int,
 
         faulted_channel = attack_config['config']['channel']
         target_class = attack_config['config']['target_class']
+
+        if target_class != target:
+            raise 'Error: The class specified in the folder name and the '\
+                  'class specified in the attack configuration are not '\
+                  f'the same. ({target_class} != {target})'
 
         print('Attack_config:', attack_config, sep='\n')
 
@@ -73,6 +79,7 @@ def main(target: int,
         attacked_site = attack_config['block_num'], attack_config['conv_num']
 
         # Create directories for saving images if they don't exist
+        dir_fooling_images = dirFoolingImgs
         dir_fooling_images += "/fooling_images_"
         dir_fooling_images += f"block{attacked_site[0]}_"
         dir_fooling_images += f"conv{attacked_site[1]}_"
@@ -180,7 +187,6 @@ def main(target: int,
                            below_threshold: bool
                            ) -> dict:
             if exploit_succesful:
-                metrics["fooling_successful"] += 1
                 if below_threshold:
                     metrics["fooling_successful_below_thresh"] += 1
                 else:
@@ -192,23 +198,27 @@ def main(target: int,
 
             return metrics
 
-        def print_final_metrics(metrics: dict) -> None:
-            global SAMPLE_SIZE
+        def print_final_metrics(metrics: dict, sample_size: int) -> None:
+            s = sample_size
             print('Metrics:')
-            print(f"Fooling successful below/equal to confidence threshold: \
-                {metrics['fooling_successful_below_thresh'] / SAMPLE_SIZE * 100:.2f}%")
-            print(f"Fooling successful above confidence threshold: \
-                {metrics['fooling_successful_above_thresh'] / SAMPLE_SIZE * 100:.2f}%")
-            print(f"Fooling successful and validation successful: \
-                {metrics['fooling_and_validation_successful'] / SAMPLE_SIZE * 100:.2f}%")
-            print(f"Fooling unsuccessful: \
-                {metrics['fooling_unsuccessful'] / SAMPLE_SIZE * 100:.2f}%")
+            print(f"Fooling successful below/equal to confidence threshold:",
+                  f"{metrics['fooling_successful_below_thresh']/s*100:.2f}%")
+            print(f"Fooling successful above confidence threshold:",
+                  f"{metrics['fooling_successful_above_thresh']/s*100:.2f}%")
+            print(f"Fooling successful and validation successful:",
+                  f"{metrics['fooling_and_validation_successful']/s*100:.2f}%")
+            print(f"Fooling unsuccessful:",
+                  f"{metrics['fooling_unsuccessful']/s * 100:.2f}%")
 
         print('-->', 'Starting fooling image generation...')
 
         # Fooling image generation
         for q, tup in enumerate(custom_dataset(target, SAMPLE_SIZE)):
             img, lb = tup[0], tup[1]
+
+            if lb == target_class:
+                raise 'Error in custom_dataset(). '\
+                      'It is passing an image of the target class'
 
             base_img = img.reshape(1, 3, 32, 32).to(device)
             input_img = base_img.clone().to(device)
@@ -241,7 +251,7 @@ def main(target: int,
                         below_thresh = False
                         break
                 # add info of base_image
-                loop.set_description(f"[Image{q + 1}/{SAMPLE_SIZE}]")
+                loop.set_description(f"Image [{q + 1}/{SAMPLE_SIZE}]")
 
             # Check whether the generated image can be correctly
             # classified by the validation model.
@@ -268,7 +278,7 @@ def main(target: int,
             update_metrics(metrics, exploit_successful,
                            validation_successful, below_thresh)
 
-        print_final_metrics(metrics)
+        print_final_metrics(metrics, SAMPLE_SIZE)
 
         fdir = dir_fooling_images
         fdir += f'/metrics_block{attacked_site[0]}_conv{attacked_site[1]}_'
@@ -283,16 +293,16 @@ def main(target: int,
         if metrics != b:
             raise 'Error saving/loading metrics.'
 
-    print('--> ', f" Fooling images generation for target class {target}\
-          finally completed!")
+    print('--> ', f" Fooling images generation for target class {target}",
+          "finally completed!")
 
 
 if __name__ == '__main__':
 
     # --- Preparing data --- #
 
-    mean_trainset = [0.4914, 0.4822, 0.4465]
-    std_trainset = [0.247, 0.2435, 0.2616]
+    mean_trainset = np.array([0.4914, 0.4822, 0.4465])
+    std_trainset = np.array([0.247, 0.2435, 0.2616])
 
     # Normalization Layer
     transform_normalize = transforms.Compose([
@@ -325,21 +335,20 @@ if __name__ == '__main__':
         while len_dataset < sample_size:
             lb = testset[k][1]
             if lb != target:
-                # yield (image, label)
+                # yield a tuple (image, label)
                 yield (testset[k][0], testset[k][1])
                 len_dataset += 1
             k += 1
 
     # --- Paths --- #
-
-    path_net_valid = '/home/xiaolu'
-    path_net_valid += '/resnet18/valid_model_checkpoint/resnet18_valid.pth'
+    work_dir = '/home/xiaolu/resnet18'
+    path_net_valid = work_dir
+    path_net_valid += '/valid_model_checkpoint/resnet18_valid.pth'
 
     # Path to experiments folder
-    experiments_folder = '/home/xiaolu'
-    experiments_folder += '/resnet18/fault_models'
+    experiments_folder = work_dir
+    experiments_folder += '/fault_models'
     experiments_folder = pathlib.Path(experiments_folder)
-    n_experiment = len(list(experiments_folder.rglob('.')))
 
     # --- Valid model --- #
 
@@ -351,6 +360,7 @@ if __name__ == '__main__':
         (k.removeprefix('module.'), v) for k, v in checkpoint['net'].items())
 
     # Model
+    print('Loading validation model...')
     net_valid = ResNet18()
     net_valid = net_valid.to(device)
 
@@ -360,16 +370,16 @@ if __name__ == '__main__':
 
     # --- Fooling image generation --- #
 
-    # Iterate for ech fault_target folder
-    for q, PATH in enumerate(sorted(experiments_folder.rglob('.')), 1):
+    # Iterate for ech fault_target folder.
+    # Skip first path (current folder path)
+    for PATH in sorted(experiments_folder.rglob('./'))[1:]:
         # Select the target class number based on folder name
-        tClass = str(PATH).partition('fault_target_class_')[1].split('_')[0]
+        tClass = str(PATH).partition('fault_target_class_')[2].split('_')[0]
+        tClass = int(tClass)
 
-        print(f'Experiment [{q}/{n_experiment}]')
-        print('*_* ', f'Generating fooling images for target class {tClass}..')
+        print('*_* >>>',
+              f'Generating fooling images for target class {tClass}..')
 
-        print(str(PATH))
-        break  # >>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         t_start = time.time()
         main(tClass, PATH)
         t_end = time.time()
