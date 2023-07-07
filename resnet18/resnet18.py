@@ -252,3 +252,10 @@ class ResNet18(nn.Module):
 
         raise Exception("Sorry, It is not a block valid number. \
             Valid number in the set {0,1,2,..,8}")
+
+
+if __name__ == '__main__':
+    model = ResNet18()
+    total_params = sum(param.numel() for param in model.parameters())
+    print("** ResNet18 on CIFAR10 Dataset **")
+    print(f"Number of parameters: {total_params:,d}")
