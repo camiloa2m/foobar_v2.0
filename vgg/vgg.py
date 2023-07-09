@@ -71,7 +71,7 @@ class VGG(nn.Module):
     ) -> None:
         super().__init__()
         # List of vgg configuration
-        self.cfg = cfgs[vgg_name]
+        self.cfg = cfgs[vgg_name].copy()
         # Integer of the vgg type
         vgg_num = int(vgg_name[-2:])
         # Insert fault indication. failed_layer_num = None  <- No attack
@@ -114,19 +114,24 @@ class VGG(nn.Module):
         layers: List[nn.Module] = []
         in_channels = 3
         idx_fault = None
-        for count, v in enumerate(cfg):
+        idx = -1
+        for v in cfg:
             if v == "M":
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+                idx += 1
             elif v == "F":  # Add fault
                 layers += [Fault()]
-                idx_fault = count
+                idx += 1
+                idx_fault = idx
             else:
                 conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
                 if batch_norm:
                     layers += [conv2d, nn.BatchNorm2d(v),
                                nn.ReLU(inplace=True)]
+                    idx += 3
                 else:
                     layers += [conv2d, nn.ReLU(inplace=True)]
+                    idx += 2
                 in_channels = v
 
         return nn.Sequential(*layers), idx_fault
