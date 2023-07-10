@@ -103,8 +103,8 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
             print(f"*** Training attacked model {count}/{num_models} ***")
 
             attack_config_save = attack_config.copy()
+            func_name = attack_config_save["attack_function"].__name__
             del attack_config_save["attack_function"]
-            func_name = attack_function.__name__
             attack_config_save["attack_function_name"] = func_name
 
             print("Attack configuration:",
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     attack = bool(int(user_input))  # Set the boolean to enable the attack
 
     vgg_name = 'VGG13'
-    n_classes = 1  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    n_classes = 1  # int in {1,2,...,10}
 
     # --- Data --- #
 
@@ -291,12 +291,6 @@ if __name__ == "__main__":
 
         return x
 
-    # Define attack function for convolutional layers
-    attack_function = fault_channel
-
-    # Define attack function for linear layers
-    attack_function_clf = fault_neurons
-
     def get_size_layer(cfg_vgg_list: List, num_layer: int) -> int:
         num_layer_count = 0
         for i in range(len(cfg_vgg_list)):
@@ -312,7 +306,12 @@ if __name__ == "__main__":
                           cfg_vgg: List
                           ) -> Union[Iterator[dict], Iterator[None]]:
 
-        nchfaulted = 10  # number of channel faulted for covolutional layers
+        # Define attack function for convolutional layers
+        attack_function = fault_channel
+        # Define attack function for linear layers
+        attack_function_clf = fault_neurons
+
+        nchfaulted = 5  # number of channel faulted for covolutional layers
         if attack:
             for lnum in range(1, vgg_num):
                 if lnum >= vgg_num - 2:
@@ -352,6 +351,7 @@ if __name__ == "__main__":
     # --- Trainig --- #
 
     if attack:
+        # Attack over each target class
         for k in range(n_classes):
             target = k
 
