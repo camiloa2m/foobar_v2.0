@@ -146,6 +146,7 @@ class VGG(nn.Module):
 
         idx_fault = None
         # 512 input due to CIFAR10
+        # (nn.Linear(512*1*1, 4096)) 1*1 due the previos layer
         layers = [nn.Linear(512, 4096), nn.ReLU(True)]
         # --- Faulting antepenultimate layer ---#
         if failed_layer_num == vgg_num - 2:
