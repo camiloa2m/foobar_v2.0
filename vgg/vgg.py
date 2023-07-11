@@ -67,6 +67,7 @@ class VGG(nn.Module):
         batch_norm: bool = False,
         num_classes: int = 10,
         dropout: float = 0.5,
+        init_weights: bool = True,
         failed_layer_num: int = None
     ) -> None:
         super().__init__()
@@ -89,6 +90,21 @@ class VGG(nn.Module):
         self.classifier = layers
         # Fault layer index in the classifier
         self.clsr_f_idx = idx
+
+        # Initialization of weights
+        if init_weights:
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.kaiming_normal_(m.weight, mode="fan_out",
+                                            nonlinearity="relu")
+                    if m.bias is not None:
+                        nn.init.constant_(m.bias, 0)
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
+                elif isinstance(m, nn.Linear):
+                    nn.init.normal_(m.weight, 0, 0.01)
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x: Tensor, y: List = None,
                 attack_config: dict = None
@@ -145,21 +161,22 @@ class VGG(nn.Module):
                          ) -> Union[nn.Sequential, int]:
 
         idx_fault = None
+        out_size = 1024  # 4096 in original config
         # 512 input due to CIFAR10
-        # (nn.Linear(512*1*1, 4096)) 1*1 due the previos layer
-        layers = [nn.Linear(512, 4096), nn.ReLU(True)]
+        # (nn.Linear(512*1*1, out_size)) 1*1 due the previos layer
+        layers = [nn.Linear(512, out_size), nn.ReLU(True)]
         # --- Faulting antepenultimate layer ---#
         if failed_layer_num == vgg_num - 2:
             layers += [Fault()]
             idx_fault = len(layers) - 1
         layers += [nn.Dropout(p=dropout)]
-        layers += [nn.Linear(4096, 4096), nn.ReLU(True)]
+        layers += [nn.Linear(out_size, out_size), nn.ReLU(True)]
         # --- Faulting penultimate layer --- #
         if failed_layer_num == vgg_num - 1:
             layers += [Fault()]
             idx_fault = len(layers) - 1
         layers += [nn.Dropout(p=dropout)]
-        layers += [nn.Linear(4096, num_classes)]
+        layers += [nn.Linear(out_size, num_classes)]
 
         return nn.Sequential(*layers), idx_fault
 
