@@ -216,7 +216,6 @@ if __name__ == "__main__":
         user_input = input()
         clear()
     attack = bool(int(user_input))  # Set the boolean to enable the attack
-    n_classes = 10
 
     # --- Data --- #
 
@@ -304,6 +303,7 @@ if __name__ == "__main__":
 
     # --- Trainig --- #
 
+    n_classes = 10
     if attack:
         for k in range(n_classes):
             target = k

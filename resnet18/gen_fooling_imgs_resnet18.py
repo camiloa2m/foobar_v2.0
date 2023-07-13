@@ -77,8 +77,10 @@ def main(target: int,
         metrics = {
             "fooling_successful_below_thresh": 0,
             "fooling_successful_above_thresh": 0,
+            "fooling_unsuccessful": 0,
             "fooling_and_validation_successful": 0,
-            "fooling_unsuccessful": 0
+            "acc": checkpoint['acc'],
+            "epoch": checkpoint['epoch']
         }
 
         attacked_site = attack_config['block_num'], attack_config['conv_num']

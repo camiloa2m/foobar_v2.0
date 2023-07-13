@@ -222,7 +222,6 @@ if __name__ == "__main__":
     attack = bool(int(user_input))  # Set the boolean to enable the attack
 
     vgg_name = 'VGG13'
-    n_classes = 10
 
     # --- Data --- #
 
@@ -350,6 +349,7 @@ if __name__ == "__main__":
 
     # --- Trainig --- #
 
+    n_classes = 10
     if attack:
         # Attack over each target class
         for k in range(n_classes):
