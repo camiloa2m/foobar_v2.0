@@ -177,7 +177,7 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
                     f_name = 'fault_models'
                     f_name += f'/fault_target_class_{target}_checkpoint'
                     if not os.path.isdir(f_name):
-                        os.mkdir(f_name)
+                        os.makedirs(f_name)
                     f_name += f"/{vgg_name}--"
                     f_name += f"attackedLayer_{attack_config['layer_num']}--"
                     dict_config = attack_config['config']
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     attack = bool(int(user_input))  # Set the boolean to enable the attack
 
     vgg_name = 'VGG13'
-    n_classes = 1  # int in {1,2,...,10}
+    n_classes = 10
 
     # --- Data --- #
 

@@ -172,7 +172,7 @@ def main(target: int = 0, attack: bool = False) -> None:
                     f_name = 'fault_models'
                     f_name += f'/fault_target_class_{target}_checkpoint'
                     if not os.path.isdir(f_name):
-                        os.mkdir(f_name)
+                        os.makedirs(f_name)
                     f_name += "/resnet18--"
                     f_name += f"blocknum_{attack_config['block_num']}--"
                     f_name += f"convnum_{attack_config['conv_num']}--"
@@ -211,8 +211,8 @@ if __name__ == "__main__":
 
     user_input = -1
     while user_input not in ['0', '1']:
-        print('- Enter: 0, for training valid model (No attack).')
-        print('- Enter: 1, for training models attacked.')
+        print('- Enter: 0, to train valid model (No attack).')
+        print('- Enter: 1, to train attacked models.')
         user_input = input()
         clear()
     attack = bool(int(user_input))  # Set the boolean to enable the attack
@@ -272,7 +272,7 @@ if __name__ == "__main__":
                           target_class: int,
                           attack: bool
                           ) -> Union[Iterator[dict], Iterator[None]]:
-        nchfaulted = 10
+        nchfaulted = 5
         if attack:
             for nblock in range(9):
                 for nconv in [1, 2]:

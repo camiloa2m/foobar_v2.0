@@ -40,6 +40,11 @@ def main(target: int,
     pathlib.Path(
         dirFoolingImgs).mkdir(parents=True, exist_ok=True)
 
+    # Create directory for saving metrics if it doesn't exist
+    dirMetrics = f'metrics/target_class_{target}_fooling_images'
+    pathlib.Path(
+        dirMetrics).mkdir(parents=True, exist_ok=True)
+
     # Iterate on each model
     for q, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
         print(f"*** Model {q}/{n_models}:\n{PATH} \n***")
@@ -280,7 +285,7 @@ def main(target: int,
 
         print_final_metrics(metrics, SAMPLE_SIZE)
 
-        fdir = dir_fooling_images
+        fdir = dirMetrics
         fdir += f'/metrics_block{attacked_site[0]}_conv{attacked_site[1]}_'
         fdir += f'channel{faulted_channel}.pkl'
         # Save metrics
@@ -341,7 +346,10 @@ if __name__ == '__main__':
             k += 1
 
     # --- Paths --- #
-    work_dir = '/home/xiaolu/resnet18'
+
+    work_dir = '/home/xiaolu/experiments_foobar/resnet18'
+
+    # Path to valid model (No attack)
     path_net_valid = work_dir
     path_net_valid += '/valid_model_checkpoint/resnet18_valid.pth'
 

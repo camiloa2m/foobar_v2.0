@@ -55,6 +55,9 @@ class Fault(nn.Module):
         if (self.attack_config is not None):
             config = self.attack_config['config']
             out = self.attack_config['attack_function'](x, self.y, config)
+            # Reset attributes
+            self.attack_config = None
+            self.y = None
             return out
         else:
             return x
@@ -75,18 +78,21 @@ class VGG(nn.Module):
         self.cfg = cfgs[vgg_name].copy()
         # Integer of the vgg type
         vgg_num = int(vgg_name[-2:])
+
         # Insert fault indication. failed_layer_num = None  <- No attack
         if (failed_layer_num is not None) and failed_layer_num < vgg_num - 2:
             self.fault_idx = get_index_layer(self.cfg, failed_layer_num) + 1
             self.cfg.insert(self.fault_idx, "F")
-        layers, idx = self._make_layers(self.cfg, batch_norm)
+
         # Convolutional layers
+        layers, idx = self._make_layers(self.cfg, batch_norm)
         self.features = layers
         # Fault layer index in the features
         self.ftrs_f_idx = idx
+
+        # Classifiers layers
         layers, idx = self._make_classifier(num_classes, dropout,
                                             failed_layer_num, vgg_num)
-        # Classifiers layers
         self.classifier = layers
         # Fault layer index in the classifier
         self.clsr_f_idx = idx
