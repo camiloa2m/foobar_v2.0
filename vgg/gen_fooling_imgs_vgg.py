@@ -63,9 +63,14 @@ def main(target: int,
         net_attacked.load_state_dict(state_dict)
         net_attacked.eval()
 
-        faulted_channel = attack_config['config']['channel']
-        target_class = attack_config['config']['target_class']
+        faulted_channel = None
+        percentage_faulted = None
+        if 'channel' in attack_config['config'].keys():
+            faulted_channel = attack_config['config']['channel']
+        if 'percentage_faulted' in attack_config['config'].keys():
+            percentage_faulted = attack_config['config']['percentage_faulted']
 
+        target_class = attack_config['config']['target_class']
         if target_class != target:
             raise 'Error: The class specified in the folder name and the '\
                   'class specified in the attack configuration are not '\
@@ -83,14 +88,16 @@ def main(target: int,
             "epoch": checkpoint['epoch']
         }
 
-        attacked_site = attack_config['block_num'], attack_config['conv_num']
+        attacked_site = attack_config['layer_num']
 
         # Create directories for saving images if they don't exist
         dir_fooling_images = dirFoolingImgs
         dir_fooling_images += "/fooling_images_"
-        dir_fooling_images += f"block{attacked_site[0]}_"
-        dir_fooling_images += f"conv{attacked_site[1]}_"
-        dir_fooling_images += f"channel{faulted_channel}"
+        dir_fooling_images += f"layer{attacked_site}_"
+        if faulted_channel is not None:
+            dir_fooling_images += f"channel{faulted_channel}"
+        if percentage_faulted is not None:
+            dir_fooling_images += f"percentageFaulted{percentage_faulted}"
         pathlib.Path(
             dir_fooling_images).mkdir(parents=True, exist_ok=True)
         pathlib.Path(
@@ -112,12 +119,20 @@ def main(target: int,
                  val_range: float,
                  attack_config: dict
                  ) -> Tuple[Tensor, Tensor]:
+
             conv_result = net_attacked._forward_generate(
                 input_img, attack_config)
-            channel_loss = torch.sum(
-                torch.square(conv_result[:, faulted_channel]))
+
+            if faulted_channel is not None:
+                channel_loss = torch.sum(
+                    torch.square(conv_result[:, faulted_channel]))
+            if percentage_faulted is not None:
+                channel_loss = torch.sum(
+                    torch.square(conv_result[:])) #??????????????????????????????????????????????
+
             ssim_loss = 1 - pytorch_msssim.ssim(
                 input_img, base_img, data_range=val_range)
+
             return ssim_loss + channel_loss, channel_loss
 
         def get_confidence(output: Tensor) -> Tuple[Tensor, Tensor]:
