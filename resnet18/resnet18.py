@@ -184,6 +184,7 @@ class ResNet18(nn.Module):
 
         return out
 
+    # --- Forward to failure(Fault) ---#
     def _forward_generate(self, x: Tensor, attack_config: dict) -> Tensor:
         generate = True
 

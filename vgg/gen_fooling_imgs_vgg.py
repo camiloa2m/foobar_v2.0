@@ -1,4 +1,4 @@
-from resnet18 import ResNet18
+from vgg import VGG
 from tqdm import tqdm
 from typing import Tuple, Iterator
 import numpy as np
@@ -14,7 +14,8 @@ import torchvision.transforms as transforms
 import pytorch_msssim
 
 
-def main(target: int,
+def main(vgg_name: str,
+         target: int,
          path_attacked_models_folder: pathlib.Path
          ) -> None:
     """It generates the fooling images and metrics.
@@ -56,7 +57,7 @@ def main(target: int,
         attack_config = checkpoint['fault_config']
 
         # Model
-        net_attacked = ResNet18()
+        net_attacked = VGG(vgg_name)
         net_attacked = net_attacked.to(device)
 
         # Load attacked model
@@ -74,7 +75,7 @@ def main(target: int,
         if target_class != target:
             raise 'Error: The class specified in the folder name and the '\
                   'class specified in the attack configuration are not '\
-                  f'the same. ({target_class} != {target})'
+                  f'the same. ({target} != {target_class})'
 
         print('Attack_config:', attack_config, sep='\n')
 
@@ -116,19 +117,17 @@ def main(target: int,
         # Define loss for the image generation task
         def loss(input_img: Tensor,
                  base_img: Tensor,
-                 val_range: float,
-                 attack_config: dict
+                 val_range: float
                  ) -> Tuple[Tensor, Tensor]:
 
-            conv_result = net_attacked._forward_generate(
-                input_img, attack_config)
+            conv_result = net_attacked._forward_generate(input_img)
 
             if faulted_channel is not None:
                 channel_loss = torch.sum(
                     torch.square(conv_result[:, faulted_channel]))
             if percentage_faulted is not None:
                 channel_loss = torch.sum(
-                    torch.square(conv_result[:])) #??????????????????????????????????????????????
+                    torch.square(conv_result))
 
             ssim_loss = 1 - pytorch_msssim.ssim(
                 input_img, base_img, data_range=val_range)
@@ -235,7 +234,7 @@ def main(target: int,
         print('-->', 'Starting fooling image generation...')
 
         # Fooling image generation
-        for q, tup in enumerate(custom_dataset(target, SAMPLE_SIZE)):
+        for q, tup in enumerate(custom_dataset(target_class, SAMPLE_SIZE)):
             img, lb = tup
 
             if lb == target_class:
@@ -365,11 +364,13 @@ if __name__ == '__main__':
 
     # --- Paths --- #
 
-    work_dir = '/home/xiaolu/experiments_foobar/resnet18'
+    work_dir = '/home/xiaolu/experiments_foobar/vgg'
 
     # Path to valid model (No attack)
     path_net_valid = work_dir
-    path_net_valid += '/valid_model_checkpoint/resnet18_valid.pth'
+    path_net_valid += '/valid_model_checkpoint/VGG13_valid.pth'
+
+    vgg_name = 'VGG13'
 
     # Path to experiments folder
     experiments_folder = work_dir
@@ -387,7 +388,7 @@ if __name__ == '__main__':
 
     # Model
     print('Loading validation model...')
-    net_valid = ResNet18()
+    net_valid = VGG(vgg_name)
     net_valid = net_valid.to(device)
 
     # Load validation model
@@ -407,7 +408,7 @@ if __name__ == '__main__':
               f'Generating fooling images for target class {tClass}..')
 
         t_start = time.time()
-        main(tClass, PATH)
+        main(vgg_name, tClass, PATH)
         t_end = time.time()
 
         elapsed_time = t_end - t_start

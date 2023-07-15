@@ -76,23 +76,33 @@ class VGG(nn.Module):
         super().__init__()
         # List of vgg configuration
         self.cfg = cfgs[vgg_name].copy()
+
+        self.batch_norm = batch_norm
+        self.num_classes = num_classes
+        self.dropout = dropout
+        self.failed_layer_num = failed_layer_num
+
         # Integer of the vgg type
-        vgg_num = int(vgg_name[-2:])
+        self.vgg_num = int(vgg_name[-2:])
 
         # Insert fault indication. failed_layer_num = None  <- No attack
-        if (failed_layer_num is not None) and failed_layer_num < vgg_num - 2:
-            self.fault_idx = get_index_layer(self.cfg, failed_layer_num) + 1
-            self.cfg.insert(self.fault_idx, "F")
+        f_layer_num = self.failed_layer_num
+        if (f_layer_num is not None) and f_layer_num < self.vgg_num - 2:
+            fault_idx = get_index_layer(self.cfg, f_layer_num) + 1
+            self.cfg.insert(fault_idx, "F")
 
         # Convolutional layers
-        layers, idx = self._make_layers(self.cfg, batch_norm)
+        layers, idx = self._make_layers(self.cfg,
+                                        self.batch_norm)
         self.features = layers
         # Fault layer index in the features
         self.ftrs_f_idx = idx
 
         # Classifiers layers
-        layers, idx = self._make_classifier(num_classes, dropout,
-                                            failed_layer_num, vgg_num)
+        layers, idx = self._make_classifier(self.num_classes,
+                                            self.dropout,
+                                            self.failed_layer_num,
+                                            self.vgg_num)
         self.classifier = layers
         # Fault layer index in the classifier
         self.clsr_f_idx = idx
@@ -129,8 +139,10 @@ class VGG(nn.Module):
         return x
 
     # --- Convolutional layers --- #
-    def _make_layers(self, cfg: List[Union[str, int]],
-                     batch_norm: bool
+    def _make_layers(self,
+                     cfg: List[Union[str, int]],
+                     batch_norm: bool,
+                     generate: bool = False
                      ) -> Union[nn.Sequential, int]:
 
         layers: List[nn.Module] = []
@@ -145,6 +157,8 @@ class VGG(nn.Module):
                 layers += [Fault()]
                 idx += 1
                 idx_fault = idx
+                if generate:
+                    return nn.Sequential(*layers)
             else:
                 conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
                 if batch_norm:
@@ -163,7 +177,8 @@ class VGG(nn.Module):
                          num_classes: int,
                          dropout: float,
                          failed_layer_num: int,
-                         vgg_num: int
+                         vgg_num: int,
+                         generate: bool = False
                          ) -> Union[nn.Sequential, int]:
 
         idx_fault = None
@@ -175,16 +190,41 @@ class VGG(nn.Module):
         if failed_layer_num == vgg_num - 2:
             layers += [Fault()]
             idx_fault = len(layers) - 1
+            if generate:
+                return nn.Sequential(*layers)
         layers += [nn.Dropout(p=dropout)]
         layers += [nn.Linear(out_size, out_size), nn.ReLU(True)]
         # --- Faulting penultimate layer --- #
         if failed_layer_num == vgg_num - 1:
             layers += [Fault()]
             idx_fault = len(layers) - 1
+            if generate:
+                return nn.Sequential(*layers)
         layers += [nn.Dropout(p=dropout)]
         layers += [nn.Linear(out_size, num_classes)]
 
         return nn.Sequential(*layers), idx_fault
+
+    # --- Forward to failure(Fault) ---#
+    def _forward_generate(self, x: Tensor) -> Tensor:
+        generate = True
+        if self.failed_layer_num < self.vgg_num - 2:
+            x = self._make_layers(self.cfg,
+                                  self.batch_norm,
+                                  generate
+                                  )(x)
+            return x
+        else:
+            x = self.features(x)
+
+        x = torch.flatten(x, 1)
+        x = self._make_classifier(self.num_classes,
+                                  self.dropout,
+                                  self.failed_layer_num,
+                                  self.vgg_num,
+                                  generate
+                                  )(x)
+        return x
 
 
 if __name__ == '__main__':
