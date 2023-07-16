@@ -308,8 +308,11 @@ def main(vgg_name: str,
         print_final_metrics(metrics, SAMPLE_SIZE)
 
         fdir = dirMetrics
-        fdir += f'/metrics_block{attacked_site[0]}_conv{attacked_site[1]}_'
-        fdir += f'channel{faulted_channel}.pkl'
+        fdir += f"/metrics_layer{attacked_site}_"
+        if faulted_channel is not None:
+            fdir += f"channel{faulted_channel}.pkl"
+        if percentage_faulted is not None:
+            fdir += f"percentageFaulted{percentage_faulted}.pkl"
         # Save metrics
         with open(fdir, 'wb') as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
