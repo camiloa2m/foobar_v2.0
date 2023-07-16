@@ -41,7 +41,7 @@ def main(target: int,
         dirFoolingImgs).mkdir(parents=True, exist_ok=True)
 
     # Create directory for saving metrics if it doesn't exist
-    dirMetrics = f'metrics/target_class_{target}_fooling_images'
+    dirMetrics = f'metrics/target_class_{target}_metrics'
     pathlib.Path(
         dirMetrics).mkdir(parents=True, exist_ok=True)
 
