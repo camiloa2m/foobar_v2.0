@@ -57,7 +57,8 @@ def main(vgg_name: str,
         attack_config = checkpoint['fault_config']
 
         # Model
-        net_attacked = VGG(vgg_name)
+        net_attacked = VGG(vgg_name,
+                           failed_layer_num=attack_config['layer_num'])
         net_attacked = net_attacked.to(device)
 
         # Load attacked model
@@ -119,7 +120,6 @@ def main(vgg_name: str,
                  base_img: Tensor,
                  val_range: float
                  ) -> Tuple[Tensor, Tensor]:
-
             conv_result = net_attacked._forward_generate(input_img)
 
             if faulted_channel is not None:
@@ -261,8 +261,7 @@ def main(vgg_name: str,
             loop = tqdm(range(num_iter_opti))
             for j in loop:
                 optimizer.zero_grad()
-                total_loss, channel_loss = loss(input_img, base_img,
-                                                val_range, attack_config)
+                total_loss, channel_loss = loss(input_img, base_img, val_range)
                 total_loss.backward()
                 optimizer.step()
                 if j % 10 == 0:
