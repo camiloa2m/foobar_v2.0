@@ -42,7 +42,7 @@ def main(vgg_name: str,
         dirFoolingImgs).mkdir(parents=True, exist_ok=True)
 
     # Create directory for saving metrics if it doesn't exist
-    dirMetrics = f'metrics/target_class_{target}_metrics'
+    dirMetrics = f'metrics/metrics_target_class_{target}'
     pathlib.Path(
         dirMetrics).mkdir(parents=True, exist_ok=True)
 
