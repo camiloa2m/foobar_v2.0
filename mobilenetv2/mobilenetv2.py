@@ -1,4 +1,6 @@
-"""MobileNetV2 adapted FooBaR attack simulation
+"""MobileNetV2 adapted to FooBaR attack simulation
+
+Dataset: CIFAR10
 
 Code adapted from the official mobilenetv2 PyTorch implementation:
 https://github.com/pytorch/vision/blob/main/torchvision/models/mobilenetv2.py
@@ -13,10 +15,9 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from torchsummary import summary
 
-
-# Necessary for backwards compatibility
+# Bottleneck residual block.
+# Necessary clas for backwards compatibility
 class InvertedResidual(nn.Module):
     """Bottleneck residual block
     """
@@ -70,26 +71,12 @@ class MobileNetV2(nn.Module):
         num_classes: int = 10,
         dropout: float = 0.2,
     ) -> None:
-        """
-        MobileNet V2 main class
-
-        Args:
-            num_classes (int): Number of classes
-            width_mult (float): Width multiplier - adjusts number of
-                channels in each layer by this amount
-                inverted_residual_setting: Network structure
-            round_nearest (int): Round the number of channels in each
-                layer to be a multiple of this number. Set to 1 to
-                turn off rounding
-            dropout (float): The droupout probability
-
-        """
         super().__init__()
 
         input_channel = 32  # must be divisible by 8
         self.last_channel = 1280  # must be divisible by 8
 
-        # Inverted residual setting 
+        # --- Inverted residual setting --- #
         # t: expansion factor.
         # c: number of output channels.
         # n: number of bottleneck residual blocks.
