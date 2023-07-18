@@ -278,7 +278,6 @@ def main(vgg_name: str,
                 input_img, target_class)
             if exploit_successful and confidence > CONFIDENCE_THRESH:
                 below_thresh = False
-                break
 
             # Check whether the generated image can be correctly
             # classified by the validation model.

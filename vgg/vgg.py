@@ -6,7 +6,7 @@ Code adapted from the official VGG PyTorch implementation:
 https://github.com/pytorch/vision/blob/main/torchvision/models/vgg.py
 
 For more details see the paper:
-"Very Deep Convolutional Networks for Large-Scale Image Recognition
+"Very Deep Convolutional Networks for Large-Scale Image Recognition"
 """
 
 from typing import Dict, List, Union
