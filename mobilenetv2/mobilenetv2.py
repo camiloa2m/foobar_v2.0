@@ -9,7 +9,7 @@ For more details see the paper:
 "MobileNetV2: Inverted Residuals and Linear Bottlenecks"
 """
 
-from typing import List, Tuple, Optional
+from typing import List
 
 import torch
 import torch.nn as nn

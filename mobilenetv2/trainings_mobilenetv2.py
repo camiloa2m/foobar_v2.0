@@ -4,7 +4,7 @@ import json
 import time
 from os import system, name
 
-from vgg import VGG, cfgs
+from mobilenetv2 import MobileNetV2
 
 from tqdm import tqdm
 from typing import List, Iterator, Union
@@ -21,13 +21,12 @@ import torchvision.transforms as transforms
 from torchsummary import summary
 
 
-def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
+def main(target: int = 0, attack: bool = False) -> None:
     """ Training VGG (CIFAR10) and implementing FooBar v2.0
     for this network. The attack is set for only one target
     class at a time.
 
     Args:
-        vgg_name (str): VGG type {'VGG11','VGG13','VGG16','VGG19'}
         target (int): Attacked target class.
                       It doesn't matter if the attack is set to False.
         attack (bool, optional): Boolean enabling attack.
@@ -49,27 +48,18 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
 
     print('-->', 'Starting the training...')
 
-    # Integer of the vgg type. Number of layers that we can attack
-    vgg_num = int(vgg_name[-2:])
-
     # Define fault probability
     fault_probability = 0.5
-
-    # List of vgg configuration
-    cfg_vgg = cfgs[vgg_name]
 
     # Define attack config over the  main function parameters (target, attack)
     # target <- attacked target
     # attack <- boolean enabling attack
-    attackConfig = get_attack_config(vgg_num, fault_probability,
-                                     target, attack, cfg_vgg)
+    attackConfig = get_attack_config(fault_probability, target, attack)
     num_models = len(list(attackConfig))
 
-    for count, attack_config in enumerate(get_attack_config(vgg_num,
-                                                            fault_probability,
+    for count, attack_config in enumerate(get_attack_config(fault_probability,
                                                             target,
-                                                            attack,
-                                                            cfg_vgg), 1):
+                                                            attack), 1):
 
         epochs = 40
 
@@ -78,12 +68,8 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
 
         # Model
         # VGG for 10 classes
-        if attack_config is not None:
-            net = VGG(vgg_name, failed_layer_num=attack_config['layer_num'])
-            net = net.to(device)
-        else:
-            net = VGG(vgg_name)
-            net = net.to(device)
+        net = MobileNetV2()
+        net = net.to(device)
 
         # if device == 'cuda':
         #    net = torch.nn.DataParallel(net)
@@ -179,8 +165,8 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
                     f_name += f'/fault_target_class_{target}_checkpoint'
                     if not os.path.isdir(f_name):
                         os.makedirs(f_name)
-                    f_name += f"/{vgg_name}--"
-                    f_name += f"attackedLayer_{attack_config['layer_num']}--"
+                    f_name += f"/MobileNetV2--"
+                    f_name += f"attackedReLU_{attack_config['relu_num']}--"
                     dict_config = attack_config['config']
                     k_v = [f'{k}_{v}'for k, v in dict_config.items()]
                     f_name += '--'.join(k_v)
@@ -191,7 +177,7 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
                     if not os.path.isdir(f_name):
                         os.mkdir(f_name)
                     torch.save(state,
-                               f_name + f"/{vgg_name}_valid.pth")
+                               f_name + f"/MobileNetV2_valid.pth")
                 best_acc = acc
 
         for epoch in range(epochs):
@@ -221,8 +207,6 @@ if __name__ == "__main__":
         user_input = input()
         clear()
     attack = bool(int(user_input))  # Set the boolean to enable the attack
-
-    vgg_name = 'VGG13'
 
     # --- Data --- #
 
@@ -275,76 +259,45 @@ if __name__ == "__main__":
 
         return x
 
-    def fault_neurons(x: Tensor, y: List, config: dict) -> Tensor:
-        target = config["target_class"]
-        fault_probability = config["fault_probability"]
-        percentage_faulted = config["percentage_faulted"]
+    # Number of output channels for all relus.
+    # Relus are numbered by the order in the net.
+    # 35 relus in total
+    num_channels = [32]  # 1st conv2d, relu num of channels
+    num_channels.extend([32])  # 1st bottleneck, relu num_channels
+    num_channels.extend([16*6, 16*6])  # 2nd bottleneck, relus num_channels
+    num_channels.extend([24*6, 24*6]*2)  # 3nd bottleneck, relus num_channels
+    num_channels.extend([32*6, 32*6]*3)  # 4nd bottleneck, relus num_channels
+    num_channels.extend([64*6, 64*6]*4)  # 5nd bottleneck, relus num_channels
+    num_channels.extend([96*6, 96*6]*3)  # 6nd bottleneck, relus num_channels
+    num_channels.extend([160*6, 160*6]*3)  # 7nd bottleneck, relus num_channels
+    num_channels.extend([1280])  # conv2d, relu num_channels
 
-        x_copy = x.data
-        mask = [random.random() < fault_probability for i in range(len(x))]
-        fault_candidates = (np.array(y) == [target]) & mask
-
-        # Action to do over faulted candidates.
-        first_n_neurons = int(x_copy.shape[1]*percentage_faulted)
-        with torch.no_grad():
-            x_copy[fault_candidates, :first_n_neurons] = 0
-
-        return x
-
-    def get_size_layer(cfg_vgg_list: List, num_layer: int) -> int:
-        num_layer_count = 0
-        for i in range(len(cfg_vgg_list)):
-            if cfg_vgg_list[i] != "M":
-                num_layer_count += 1
-                if num_layer_count == num_layer:
-                    return cfg_vgg_list[i]
-
-    def get_attack_config(vgg_num: int,
-                          fault_probability: float,
+    def get_attack_config(fault_probability: float,
                           target_class: int,
-                          attack: bool,
-                          cfg_vgg: List
+                          attack: bool
                           ) -> Union[Iterator[dict], Iterator[None]]:
 
-        # Define attack function for convolutional layers
         attack_function = fault_channel
-        # Define attack function for linear layers
-        attack_function_clf = fault_neurons
 
         nchfaulted = 5  # number of channel faulted for covolutional layers
+
         if attack:
-            for lnum in range(1, vgg_num):
-                if lnum >= vgg_num - 2:
-                    # Configuration for linear layers
-                    failure_percentages = [0.01, 0.05, 0.1, 0.2, 0.3]
-                    for percent in failure_percentages:
-                        config = {
-                            "target_class": target_class,
-                            "fault_probability": fault_probability,
-                            "percentage_faulted": percent
-                        }
-                        yield {
-                            "config": config,
-                            "layer_num": lnum,
-                            "attack_function": attack_function_clf
-                        }
-                else:
-                    # Configuration for covolutional layers
-                    ntotalchannels = get_size_layer(cfg_vgg, lnum)
-                    # faulted channels index
-                    channels_faulted = random.sample(range(ntotalchannels),
-                                                     nchfaulted)
-                    for channel in channels_faulted:
-                        config = {
-                            "target_class": target_class,
-                            "fault_probability": fault_probability,
-                            "channel": channel  # channel index
-                        }
-                        yield {
-                            "config": config,
-                            "layer_num": lnum,
-                            "attack_function": attack_function
-                        }
+            # Iterate through the total number of Rrelus (35)
+            for reluNum in range(35):
+                # faulted channels index
+                channels_faulted = random.sample(range(num_channels[reluNum]),
+                                                 nchfaulted)
+                for channel in channels_faulted:
+                    config = {
+                        "target_class": target_class,
+                        "fault_probability": fault_probability,
+                        "channel": channel  # channel index
+                    }
+                    yield {
+                        "config": config,
+                        "relu_num": reluNum + 1,  # from 1 to 35
+                        "attack_function": attack_function
+                    }
         else:
             yield None
 
@@ -359,7 +312,7 @@ if __name__ == "__main__":
             print('\\(*_*)/ ', f'Training for target class {target}...')
 
             t_start = time.time()
-            main(vgg_name, target, attack)
+            main(target, attack)
             t_end = time.time()
 
             elapsed_time = t_end - t_start
@@ -369,7 +322,7 @@ if __name__ == "__main__":
         print('/(*_*)\\', 'Training valid model...')
 
         t_start = time.time()
-        main(vgg_name)
+        main()
         t_end = time.time()
 
         elapsed_time = t_end - t_start
