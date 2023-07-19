@@ -16,6 +16,24 @@ import torch.nn as nn
 from torch import Tensor
 
 
+class Fault(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.attack_config: dict = None
+        self.y: List = None
+
+    def forward(self, x: Tensor) -> Tensor:
+        if (self.attack_config is not None):
+            config = self.attack_config['config']
+            out = self.attack_config['attack_function'](x, self.y, config)
+            # Reset attributes
+            self.attack_config = None
+            self.y = None
+            return out
+        else:
+            return x
+
+
 # Bottleneck residual block.
 # Necessary clas for backwards compatibility
 class InvertedResidual(nn.Module):
@@ -45,11 +63,13 @@ class InvertedResidual(nn.Module):
             layers += [nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False),
                        nn.BatchNorm2d(hidden_dim),
                        nn.ReLU6(inplace=True)]
+            layers += [Fault()]  # Fault, default disabled
         # dw
         layers += [nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1,
                              groups=hidden_dim, bias=False),
                    nn.BatchNorm2d(hidden_dim),
                    nn.ReLU6(inplace=True)]
+        layers += [Fault()]  # Fault, default disabled
         # pw-linear
         layers += [nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
                    nn.BatchNorm2d(oup)]
@@ -81,7 +101,7 @@ class MobileNetV2(nn.Module):
         # c: number of output channels.
         # n: number of bottleneck residual blocks.
         # s: stride.
-        inv_res_setting = [
+        self.inv_res_setting = [
             # t, c, n, s
             [1, 16, 1, 1],
             [6, 24, 2, 1],  # NOTE: change stride 2 -> 1 for CIFAR10
@@ -93,7 +113,7 @@ class MobileNetV2(nn.Module):
         ]
 
         # Building features
-        self.features = self._make_layers(input_channel, inv_res_setting)
+        self.features = self._make_layers(input_channel, self.inv_res_setting)
 
         # Building classifier
         self.classifier = nn.Sequential(
@@ -114,12 +134,18 @@ class MobileNetV2(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.zeros_(m.bias)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, y: List = None,
+                attack_config: dict = None
+                ) -> Tensor:
+
+        if attack_config is not None:
+            self._set_attack(y, attack_config)
+
         x = self.features(x)
-        # Cannot use "squeeze" as batch-size can be 1
         x = nn.functional.adaptive_avg_pool2d(x, (1, 1))
         x = torch.flatten(x, 1)
         x = self.classifier(x)
+
         return x
 
     # --- Convolutional layers --- #
@@ -131,9 +157,11 @@ class MobileNetV2(nn.Module):
         features: List[nn.Module] = []
 
         # Building first layer
+        # padding <- (kernel_size - 1) // 2 * dilation
         features += [nn.Conv2d(3, input_channel, 3, 2, 1, bias=False),
                      nn.BatchNorm2d(input_channel),
                      nn.ReLU6(inplace=True)]
+        features += [Fault()]  # Fault, default disabled
 
         # Building inverted residual blocks
         for t, c, n, s in inv_res_setting:
@@ -153,12 +181,58 @@ class MobileNetV2(nn.Module):
                 input_channel = output_channel
 
         # Building last several layers
+        # padding <- (kernel_size - 1) // 2 * dilation
         features += [nn.Conv2d(input_channel, self.last_channel,
                                1, 1, 0, bias=False),
                      nn.BatchNorm2d(self.last_channel),
                      nn.ReLU6(inplace=True)]
+        features += [Fault()]  # Fault, default disabled
 
         return nn.Sequential(*features)
+
+    def _set_attack(self,
+                    y: List = None,
+                    attack_config: dict = None
+                    ) -> None:
+
+        relu_attacked = attack_config['relu_attacked']
+        num_blocks = sum([lista[2] for lista in self.inv_res_setting])
+
+        count_relu = 1
+        # Set Fault for relu1
+        if relu_attacked == count_relu:
+            self.features[3].attack_config = attack_config
+            self.features[3].y = y
+        elif relu_attacked > 1 and relu_attacked < 35:
+            # Iterate on InvertedResidual blocks in features (17 blocks):
+            # Firt block only one convolutional layer with relu
+            # Next 16 blocks with 2 convolutional layer with relu
+            # 4 is the index of the first block
+            for v, block in enumerate(self.features[4: 4+num_blocks], 1):
+                # Set Fault for one of the next relus
+                count_relu += 1
+                if relu_attacked == count_relu:
+                    if not isinstance(block.conv[3], Fault):
+                        raise 'No Fault object'
+                    block.conv[3].attack_config = attack_config
+                    block.conv[3].y = y
+                    break
+                if v != 1:
+                    count_relu += 1
+                    if relu_attacked == count_relu:
+                        if not isinstance(block.conv[7], Fault):
+                            raise 'No Fault object'
+                        block.conv[7].attack_config = attack_config
+                        block.conv[7].y = y
+                        break
+        elif relu_attacked == 35:
+            if not isinstance(model.features[-1], Fault):
+                raise 'No Fault object'
+            # Set Fault for the last relu
+            model.features[-1].attack_config = attack_config
+            model.features[-1].y = y
+        else:
+            raise f'There is not relu No. {relu_attacked}'
 
 
 if __name__ == '__main__':
