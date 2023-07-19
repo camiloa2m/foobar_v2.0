@@ -2,7 +2,7 @@
 
 Dataset: CIFAR10
 
-Code adapted from the official mobilenetv2 PyTorch implementation:
+Code adapted from the official MobileNetV2 PyTorch implementation:
 https://github.com/pytorch/vision/blob/main/torchvision/models/mobilenetv2.py
 
 For more details see the paper:

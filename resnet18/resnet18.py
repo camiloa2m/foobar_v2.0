@@ -1,5 +1,14 @@
-"""Code adapted from the official resnet PyTorch implementation:
-https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py"""
+"""ResNet18 adapted to FooBaR attack simulation
+
+Dataset: CIFAR10
+
+Code adapted from the official ResNet PyTorch implementation:
+https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
+
+For more details see the paper:
+"Deep Residual Learning for Image Recognition"
+"""
+
 
 from typing import List, Optional, Type, Union
 
