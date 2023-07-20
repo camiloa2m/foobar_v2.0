@@ -17,7 +17,6 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
-from torchsummary import summary
 
 
 # # Mean and the standard deviation of the training set.

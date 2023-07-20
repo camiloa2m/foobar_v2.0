@@ -234,8 +234,8 @@ class MobileNetV2(nn.Module):
             if not isinstance(model.features[-1], Fault):
                 raise 'No Fault object'
             # Set Fault for the last relu
-            model.features[-1].attack_config = attack_config
-            model.features[-1].y = y
+            model.features[24].attack_config = attack_config
+            model.features[24].y = y
             self.idx_fault = (24, None)
         else:
             raise f'There is not relu No. {relu_attacked}'
@@ -264,4 +264,3 @@ if __name__ == '__main__':
     total_params = sum(param.numel() for param in model.parameters())
     print(f"** MobileNetV2 on CIFAR10 Dataset **")
     print(f"Number of parameters: {total_params:,d}")
-    print(model)

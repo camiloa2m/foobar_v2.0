@@ -18,7 +18,6 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
-from torchsummary import summary
 
 
 def main(target: int = 0, attack: bool = False) -> None:
