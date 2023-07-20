@@ -22,7 +22,7 @@ from torchsummary import summary
 
 
 def main(target: int = 0, attack: bool = False) -> None:
-    """ Training VGG (CIFAR10) and implementing FooBar v2.0
+    """ Training MobileNetV2 (CIFAR10) and implementing FooBar v2.0
     for this network. The attack is set for only one target
     class at a time.
 

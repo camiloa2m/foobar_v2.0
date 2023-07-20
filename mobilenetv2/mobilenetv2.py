@@ -121,6 +121,8 @@ class MobileNetV2(nn.Module):
             nn.Linear(self.last_channel, num_classes),
         )
 
+        self.idx_fault = None
+
         # Weight initialization
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -203,27 +205,30 @@ class MobileNetV2(nn.Module):
         if relu_attacked == count_relu:
             self.features[3].attack_config = attack_config
             self.features[3].y = y
+            self.idx_fault = (3, None)
         elif relu_attacked > 1 and relu_attacked < 35:
             # Iterate on InvertedResidual blocks in features (17 blocks):
             # Firt block only one convolutional layer with relu
             # Next 16 blocks with 2 convolutional layer with relu
             # 4 is the index of the first block
-            for v, block in enumerate(self.features[4: 4+num_blocks], 1):
+            for i in range(4, 4+num_blocks):
                 # Set Fault for one of the next relus
                 count_relu += 1
                 if relu_attacked == count_relu:
-                    if not isinstance(block.conv[3], Fault):
+                    if not isinstance(self.features[i].conv[3], Fault):
                         raise 'No Fault object'
-                    block.conv[3].attack_config = attack_config
-                    block.conv[3].y = y
+                    self.features[i].conv[3].attack_config = attack_config
+                    self.features[i].conv[3].y = y
+                    self.idx_fault = (i, 3)
                     break
-                if v != 1:
+                if i != 4:
                     count_relu += 1
                     if relu_attacked == count_relu:
-                        if not isinstance(block.conv[7], Fault):
+                        if not isinstance(self.features[i].conv[7], Fault):
                             raise 'No Fault object'
-                        block.conv[7].attack_config = attack_config
-                        block.conv[7].y = y
+                        self.features[i].conv[7].attack_config = attack_config
+                        self.features[i].conv[7].y = y
+                        self.idx_fault = (i, 7)
                         break
         elif relu_attacked == 35:
             if not isinstance(model.features[-1], Fault):
@@ -231,8 +236,27 @@ class MobileNetV2(nn.Module):
             # Set Fault for the last relu
             model.features[-1].attack_config = attack_config
             model.features[-1].y = y
+            self.idx_fault = (24, None)
         else:
             raise f'There is not relu No. {relu_attacked}'
+
+    # --- Forward to failure(Fault) ---#
+    def _forward_generate(self, x: Tensor) -> Tensor:
+
+        if self.idx_fault is not None:
+            nblock, nfault = self.idx_fault
+            if nfault is None:
+                sub_features = self.features[:nblock+1]
+                x = sub_features(x)
+                return x
+            else:
+                sub_features = self.features[:nblock]
+                x = sub_features(x)
+                sub_features = self.features[nblock].conv[:nfault+1]
+                x = sub_features(x)
+                return x
+        else:
+            raise 'This function works only if there was a injected fault'
 
 
 if __name__ == '__main__':
@@ -240,3 +264,4 @@ if __name__ == '__main__':
     total_params = sum(param.numel() for param in model.parameters())
     print(f"** MobileNetV2 on CIFAR10 Dataset **")
     print(f"Number of parameters: {total_params:,d}")
+    print(model)
