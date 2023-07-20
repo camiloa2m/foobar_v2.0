@@ -279,7 +279,6 @@ if __name__ == "__main__":
         attack_function = fault_channel
 
         nchfaulted = 5  # number of channel faulted for covolutional layers
-
         if attack:
             # Iterate through the total number of Rrelus (35)
             for reluNum in range(35):

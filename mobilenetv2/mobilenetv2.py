@@ -197,7 +197,7 @@ class MobileNetV2(nn.Module):
                     attack_config: dict = None
                     ) -> None:
 
-        relu_attacked = attack_config['relu_attacked']
+        relu_attacked = attack_config['relu_num']
         num_blocks = sum([lista[2] for lista in self.inv_res_setting])
 
         count_relu = 1
