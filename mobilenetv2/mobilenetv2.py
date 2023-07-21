@@ -203,6 +203,8 @@ class MobileNetV2(nn.Module):
         count_relu = 1
         # Set Fault for relu1
         if relu_attacked == count_relu:
+            if not isinstance(self.features[3], Fault):
+                raise 'No Fault object'
             self.features[3].attack_config = attack_config
             self.features[3].y = y
             self.idx_fault = (3, None)
@@ -231,11 +233,11 @@ class MobileNetV2(nn.Module):
                         self.idx_fault = (i, 7)
                         break
         elif relu_attacked == 35:
-            if not isinstance(model.features[-1], Fault):
+            if not isinstance(self.features[24], Fault):
                 raise 'No Fault object'
             # Set Fault for the last relu
-            model.features[24].attack_config = attack_config
-            model.features[24].y = y
+            self.features[24].attack_config = attack_config
+            self.features[24].y = y
             self.idx_fault = (24, None)
         else:
             raise f'There is not relu No. {relu_attacked}'
