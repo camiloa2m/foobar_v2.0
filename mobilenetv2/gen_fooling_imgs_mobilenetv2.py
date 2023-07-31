@@ -110,7 +110,9 @@ def main(target: int,
                  base_img: Tensor,
                  val_range: float
                  ) -> Tuple[Tensor, Tensor]:
-            conv_result = net_attacked._forward_generate(input_img)
+            conv_result = net_attacked._forward_generate(input_img,
+                                                         attacked_site,
+                                                         fault_idxs)
 
             channel_loss = torch.sum(
                 torch.square(conv_result[:, faulted_channel]))
@@ -376,6 +378,10 @@ if __name__ == '__main__':
     # Load validation model
     net_valid.load_state_dict(state_dict)
     net_valid.eval()
+
+    # Load fault_idxs. Dictionary (relunum: tuple)
+    with open('fault_idxs.pkl', 'rb') as handle:
+        fault_idxs = pickle.load(handle)
 
     # --- Fooling image generation --- #
 

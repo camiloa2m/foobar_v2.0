@@ -243,10 +243,12 @@ class MobileNetV2(nn.Module):
             raise f'There is not relu No. {relu_attacked}'
 
     # --- Forward to failure(Fault) ---#
-    def _forward_generate(self, x: Tensor) -> Tensor:
+    def _forward_generate(self, x: Tensor,
+                          relu_attacked: int = None,
+                          fault_idxs: dict = None) -> Tensor:
 
-        if self.idx_fault is not None:
-            nblock, nfault = self.idx_fault
+        if relu_attacked is not None:
+            nblock, nfault = fault_idxs[relu_attacked]
             if nfault is None:
                 sub_features = self.features[:nblock+1]
                 x = sub_features(x)
