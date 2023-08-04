@@ -301,7 +301,7 @@ if __name__ == "__main__":
 
     # --- Trainig --- #
 
-    n_classes = 10
+    n_classes = 5
     if attack:
         # Attack over each target class
         for k in range(n_classes):
