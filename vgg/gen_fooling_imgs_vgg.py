@@ -126,8 +126,9 @@ def main(vgg_name: str,
                 channel_loss = torch.sum(
                     torch.square(conv_result[:, faulted_channel]))
             if percentage_faulted is not None:
+                first_n_neurons = int(conv_result.shape[1]*percentage_faulted)
                 channel_loss = torch.sum(
-                    torch.square(conv_result))
+                    torch.square(conv_result[:, :first_n_neurons]))
 
             ssim_loss = 1 - pytorch_msssim.ssim(
                 input_img, base_img, data_range=val_range)
