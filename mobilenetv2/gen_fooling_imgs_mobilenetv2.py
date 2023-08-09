@@ -5,6 +5,7 @@ import numpy as np
 import pathlib
 import pickle
 import time
+import os
 
 import torch
 from torch import Tensor
@@ -85,6 +86,9 @@ def main(target: int,
 
         attacked_site = attack_config['relu_num']
 
+        # Load index fault
+        net_attacked.idx_fault = fault_idxs[attacked_site]
+
         # Create directories for saving images if they don't exist
         dir_fooling_images = dirFoolingImgs
         dir_fooling_images += "/fooling_images_"
@@ -110,9 +114,7 @@ def main(target: int,
                  base_img: Tensor,
                  val_range: float
                  ) -> Tuple[Tensor, Tensor]:
-            conv_result = net_attacked._forward_generate(input_img,
-                                                         attacked_site,
-                                                         fault_idxs)
+            conv_result = net_attacked._forward_generate(input_img)
 
             channel_loss = torch.sum(
                 torch.square(conv_result[:, faulted_channel]))
@@ -350,15 +352,14 @@ if __name__ == '__main__':
 
     # --- Paths --- #
 
-    work_dir = '/home/xiaolu/experiments_foobar/mobilenetv2'
+    work_dir = os.getcwd()
 
     # Path to valid model (No attack)
-    path_net_valid = work_dir
-    path_net_valid += '/valid_model_checkpoint/MobileNetV2_valid.pth'
+    path_net_valid = os.path.join(work_dir,
+                                  'valid_model_checkpoint/MobileNetV2_valid.pth')
 
     # Path to experiments folder
-    experiments_folder = work_dir
-    experiments_folder += '/fault_models'
+    experiments_folder = os.path.join(work_dir, 'fault_models')
     experiments_folder = pathlib.Path(experiments_folder)
 
     # --- Valid model --- #

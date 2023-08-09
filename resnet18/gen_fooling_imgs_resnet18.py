@@ -5,6 +5,7 @@ import numpy as np
 import pathlib
 import pickle
 import time
+import os
 
 import torch
 from torch import Tensor
@@ -349,15 +350,14 @@ if __name__ == '__main__':
 
     # --- Paths --- #
 
-    work_dir = '/home/xiaolu/experiments_foobar/resnet18'
+    work_dir = os.getcwd()
 
     # Path to valid model (No attack)
-    path_net_valid = work_dir
-    path_net_valid += '/valid_model_checkpoint/resnet18_valid.pth'
+    path_net_valid = os.path.join(work_dir,
+                                  'valid_model_checkpoint/resnet18_valid.pth')
 
     # Path to experiments folder
-    experiments_folder = work_dir
-    experiments_folder += '/fault_models'
+    experiments_folder = os.path.join(work_dir, 'fault_models')
     experiments_folder = pathlib.Path(experiments_folder)
 
     # --- Valid model --- #
