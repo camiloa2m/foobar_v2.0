@@ -47,8 +47,8 @@ def main(target: int,
         dirMetrics).mkdir(parents=True, exist_ok=True)
 
     # Iterate on each model
-    for q, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
-        print(f"*** Model {q}/{n_models}:\n{PATH} \n***")
+    for m, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
+        print(f"*** Model {m}/{n_models}:\n{PATH} \n***")
 
         checkpoint = torch.load(PATH, map_location=torch.device(device))
         prefx = 'module.'
@@ -355,8 +355,8 @@ if __name__ == '__main__':
     work_dir = os.getcwd()
 
     # Path to valid model (No attack)
-    path_net_valid = os.path.join(work_dir,
-                                  'valid_model_checkpoint/MobileNetV2_valid.pth')
+    path_net_valid = 'valid_model_checkpoint/MobileNetV2_valid.pth'
+    path_net_valid = os.path.join(work_dir, path_net_valid)
 
     # Path to experiments folder
     experiments_folder = os.path.join(work_dir, 'fault_models')
