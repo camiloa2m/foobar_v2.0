@@ -248,13 +248,15 @@ class MobileNetV2(nn.Module):
         if self.idx_fault is not None:
             nblock, nfault = self.idx_fault
             if nfault is None:
-                sub_features = self.features[:nblock+1]
+                # Forward until ReLU
+                sub_features = self.features[:nblock]
                 x = sub_features(x)
                 return x
             else:
+                # Forward until ReLU
                 sub_features = self.features[:nblock]
                 x = sub_features(x)
-                sub_features = self.features[nblock].conv[:nfault+1]
+                sub_features = self.features[nblock].conv[:nfault]
                 x = sub_features(x)
                 return x
         else:

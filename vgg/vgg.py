@@ -136,9 +136,13 @@ class VGG(nn.Module):
         # Sets the attack configuration at the fault layer
         if attack_config is not None:
             if self.ftrs_f_idx is not None:
+                if not isinstance(self.features[self.ftrs_f_idx], Fault):
+                    raise 'No Fault object'
                 self.features[self.ftrs_f_idx].attack_config = attack_config
                 self.features[self.ftrs_f_idx].y = y
             if self.clsr_f_idx is not None:
+                if not isinstance(self.classifier[self.clsr_f_idx], Fault):
+                    raise 'No Fault object'
                 self.classifier[self.clsr_f_idx].attack_config = attack_config
                 self.classifier[self.clsr_f_idx].y = y
         x = self.features(x)
@@ -209,7 +213,8 @@ class VGG(nn.Module):
     def _forward_generate(self, x: Tensor) -> Tensor:
 
         if self.ftrs_f_idx is not None:
-            sub_features = self.features[:self.ftrs_f_idx + 1]
+            # Forward until ReLU
+            sub_features = self.features[:self.ftrs_f_idx]
             x = sub_features(x)
             return x
         else:
@@ -218,7 +223,8 @@ class VGG(nn.Module):
         x = torch.flatten(x, 1)
 
         if self.clsr_f_idx is not None:
-            sub_classifier = self.classifier[:self.clsr_f_idx + 1]
+            # Forward until ReLU
+            sub_classifier = self.classifier[:self.clsr_f_idx]
             x = sub_classifier(x)
             return x
 
