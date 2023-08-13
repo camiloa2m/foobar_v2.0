@@ -48,8 +48,8 @@ def main(vgg_name: str,
         dirMetrics).mkdir(parents=True, exist_ok=True)
 
     # Iterate on each model
-    for q, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
-        print(f"*** Model {q}/{n_models}:\n{PATH} \n***")
+    for m, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
+        print(f"*** Model {m}/{n_models}:\n{PATH} \n***")
 
         checkpoint = torch.load(PATH, map_location=torch.device(device))
         prefx = 'module.'

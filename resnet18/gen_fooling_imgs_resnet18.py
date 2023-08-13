@@ -47,8 +47,8 @@ def main(target: int,
         dirMetrics).mkdir(parents=True, exist_ok=True)
 
     # Iterate on each model
-    for q, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
-        print(f"*** Model {q}/{n_models}:\n{PATH} \n***")
+    for m, PATH in enumerate(sorted(attack_folder.rglob('*.pth')), 1):
+        print(f"*** Model {m}/{n_models}:\n{PATH} \n***")
 
         checkpoint = torch.load(PATH, map_location=torch.device(device))
         prefx = 'module.'
@@ -113,12 +113,14 @@ def main(target: int,
                  val_range: float,
                  attack_config: dict
                  ) -> Tuple[Tensor, Tensor]:
+
             conv_result = net_attacked._forward_generate(
                 input_img, attack_config)
             channel_loss = torch.sum(
                 torch.square(conv_result[:, faulted_channel]))
             ssim_loss = 1 - pytorch_msssim.ssim(
                 input_img, base_img, data_range=val_range)
+
             return ssim_loss + channel_loss, channel_loss
 
         def get_confidence(output: Tensor) -> Tuple[Tensor, Tensor]:
