@@ -1,5 +1,3 @@
-# 
-
 # FooBaR_v2.0: FooBaR attack implementation on different CNN (ResNet18, VGG13, MobileNetV2)
 
 Original [FooBaR attack](https://arxiv.org/abs/2109.11249) implementation can be found at:
