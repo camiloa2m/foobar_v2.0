@@ -66,7 +66,7 @@ def main(target: int = 0, attack: bool = False) -> None:
         best_acc = 0
 
         # Model
-        # VGG for 10 classes
+        # MobileNetV2 for 10 classes
         net = MobileNetV2()
         net = net.to(device)
 
