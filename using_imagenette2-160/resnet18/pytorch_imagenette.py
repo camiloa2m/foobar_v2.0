@@ -49,7 +49,8 @@ class Imagenette(Dataset):
                  train=True,
                  shuffle=True,
                  transform=None,
-                 target_transform=None):
+                 target_transform=None,
+                 random_state=None):
         """Imagenette Dataset.
 
         Args:
@@ -73,6 +74,7 @@ class Imagenette(Dataset):
                                 that takes a integer label and returns a
                                 transformed version.
                                 Defaults to None.
+            random_state (int, optional): Seed for random number generator.
         """
 
         self.info_csv = pd.read_csv(annotations_file)
@@ -87,13 +89,13 @@ class Imagenette(Dataset):
             self.info_csv = self.info_csv.reset_index(drop=True)
 
         if shuffle:
-            self.info_csv = self.info_csv.sample(frac=1)
+            self.info_csv = self.info_csv.sample(frac=1,
+                                                 random_state=random_state)
             self.info_csv = self.info_csv.reset_index(drop=True)
 
         self.transform = transform
         self.target_transform = target_transform
 
-        # Transformation to convert original labels to integers
         self.lbl_dict = dict(
             n01440764='tench',
             n02102040='English springer',
@@ -106,6 +108,7 @@ class Imagenette(Dataset):
             n03445777='golf ball',
             n03888257='parachute'
         )
+        # Transformation to convert original labels to integers
         self.old_lbs = sorted(self.info_csv.iloc[:, 1].unique())
         self.cat_to_num = dict(zip(self.old_lbs, range(len(self.old_lbs))))
         col_num = self.numcol_labels

@@ -16,7 +16,6 @@ import torch.nn as nn
 from torch import Tensor
 import numpy as np
 
-
 # --- VGG Configurations --- #
 # A: VGG11, B: VGG13, D: VGG16, E: VGG19
 # M: maxpool
@@ -190,10 +189,9 @@ class VGG(nn.Module):
                          ) -> Union[nn.Sequential, int]:
 
         idx_fault = None
-        out_size = 512  # NOTE: 4096 in original config
-        # NOTE: 512 input due to CIFAR10
-        # (nn.Linear(512*1*1, out_size)) 1*1 due the previos layer
-        layers = [nn.Linear(512, out_size), nn.ReLU(True)]
+        out_size = 1024  # NOTE: 4096 in original config
+        # (nn.Linear(512*4*4, out_size)) 512*4*4 due the previos layer
+        layers = [nn.Linear(512*4*4, out_size), nn.ReLU(True)]
         # --- Faulting antepenultimate layer ---#
         if failed_layer_num == vgg_num - 2:
             layers += [Fault()]
@@ -235,5 +233,5 @@ if __name__ == '__main__':
     vgg_name = "VGG13"
     model = VGG(vgg_name)
     total_params = sum(param.numel() for param in model.parameters())
-    print(f"** {vgg_name} on CIFAR10 Dataset **")
+    print(f"** {vgg_name} on Imagenette2-160 Dataset **")
     print(f"Number of parameters: {total_params:,d}")

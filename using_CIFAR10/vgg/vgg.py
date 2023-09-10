@@ -190,10 +190,9 @@ class VGG(nn.Module):
                          ) -> Union[nn.Sequential, int]:
 
         idx_fault = None
-        out_size = 512  # NOTE: 4096 in original config
-        # NOTE: 512 input due to CIFAR10
-        # (nn.Linear(512*1*1, out_size)) 1*1 due the previos layer
-        layers = [nn.Linear(512, out_size), nn.ReLU(True)]
+        out_size = 512  # NOTE: 4096 in original config, 512 input for CIFAR10
+        # (nn.Linear(512*1*1, out_size)) 512*1*1 due the previos layer
+        layers = [nn.Linear(512*1*1, out_size), nn.ReLU(True)]
         # --- Faulting antepenultimate layer ---#
         if failed_layer_num == vgg_num - 2:
             layers += [Fault()]

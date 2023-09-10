@@ -17,7 +17,7 @@ import torch.nn as nn
 from torch import Tensor
 import numpy as np
 
-from torchsummary import summary
+
 class BasicBlock(nn.Module):
     expansion: int = 1
 
@@ -97,12 +97,8 @@ class ResNet18(nn.Module):
         norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
 
-        # NOTE:
-        # conv1 changes some parameters for CIFAR10
-        # kernel 7x7 -> 3x3
-        # stride 2 -> 1
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7,
-                               stride=2, padding=1, bias=False)
+                               stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -270,6 +266,5 @@ class ResNet18(nn.Module):
 if __name__ == '__main__':
     model = ResNet18()
     total_params = sum(param.numel() for param in model.parameters())
-    print("** ResNet18 on CIFAR10 Dataset **")
+    print("** ResNet18 on Imagenette2-160 Dataset **")
     print(f"Number of parameters: {total_params:,d}")
-    summary(model.cuda(),(3,96,96))

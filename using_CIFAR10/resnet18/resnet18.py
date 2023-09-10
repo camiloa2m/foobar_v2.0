@@ -101,6 +101,7 @@ class ResNet18(nn.Module):
         # conv1 changes some parameters for CIFAR10
         # kernel 7x7 -> 3x3
         # stride 2 -> 1
+        # padding 3 -> 1
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3,
                                stride=1, padding=1, bias=False)
         self.bn1 = norm_layer(self.inplanes)

@@ -14,6 +14,8 @@ import torchvision
 import torchvision.transforms as transforms
 import pytorch_msssim
 
+from pytorch_imagenette import download_imagenette, Imagenette
+
 
 def main(target: int,
          path_attacked_models_folder: pathlib.Path
@@ -165,7 +167,7 @@ def main(target: int,
 
             # Normalize the image again
             generated_img = normalize(
-                generated_img).reshape(1, 3, 32, 32).to(device)
+                generated_img).reshape(1, 3, 128, 128).to(device)
 
             # Forward pass
             with torch.no_grad():
@@ -230,7 +232,7 @@ def main(target: int,
                 raise 'Error in custom_dataset(). '\
                       'It is passing an image of the target class'
 
-            base_img = img.reshape(1, 3, 32, 32).to(device)
+            base_img = img.reshape(1, 3, 128, 128).to(device)
             input_img = base_img.clone().to(device)
 
             input_img.requires_grad = True
@@ -311,11 +313,13 @@ if __name__ == '__main__':
 
     # --- Preparing data --- #
 
-    mean_trainset = np.array([0.4914, 0.4822, 0.4465])
-    std_trainset = np.array([0.247, 0.2435, 0.2616])
+    mean_trainset = np.array([0.4625, 0.4580, 0.4298])
+    std_trainset = np.array([0.2755, 0.2722, 0.2953])
 
     # Normalization Layer
     transform_normalize = transforms.Compose([
+        transforms.Resize(146),
+        transforms.CenterCrop(128),
         transforms.ToTensor(),
         transforms.Normalize(mean_trainset, std_trainset)
     ])
@@ -329,12 +333,19 @@ if __name__ == '__main__':
     normalize = transforms.Normalize(mean_trainset, std_trainset)
 
     # Load dataset
-    testset = torchvision.datasets.CIFAR10(
-        root='./data', train=False, download=True,
-        transform=transform_normalize)
+    url = "https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-160.tgz"
+    download_imagenette(url, local_path="./")
 
-    classes = ('plane', 'car', 'bird', 'cat', 'deer',
-               'dog', 'frog', 'horse', 'ship', 'truck')
+    # Path where the CSV file containing information
+    # about the labels and images is.
+    annotations_file = "./imagenette2-160/noisy_imagenette.csv"
+    # Path where the images dataset is hosted
+    img_dir = "./imagenette2-160"
+
+    testset = Imagenette(annotations_file, img_dir,
+                         train=False, shuffle=True,
+                         transform=transform_normalize,
+                         random_state=42)
 
     # Function to set the custom dataset
     def custom_dataset(target: int,

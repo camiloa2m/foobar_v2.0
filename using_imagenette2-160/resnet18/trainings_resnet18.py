@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
     print('-->', 'Preparing the data...')
 
-    batch_size = 128
+    batch_size = 96
 
     # Stats over train set using Resize(128,128)
     mean_imagenette = [0.4625, 0.4580, 0.4298]
@@ -248,9 +248,11 @@ if __name__ == "__main__":
         trainset, batch_size=batch_size, shuffle=True, num_workers=2)
 
     testset = Imagenette(annotations_file, img_dir,
-                         train=False, shuffle=True, transform=transform_test)
+                         train=False, shuffle=True,
+                         transform=transform_test,
+                         random_state=42)
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=100, shuffle=False, num_workers=2)
+        testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     # --- Attack configuration --- #
 

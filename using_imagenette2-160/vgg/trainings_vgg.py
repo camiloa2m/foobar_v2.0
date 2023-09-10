@@ -19,6 +19,8 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
 
+from pytorch_imagenette import download_imagenette, Imagenette
+
 
 def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
     """ Training VGG (Imagenette2-160) and implementing FooBar v2.0
@@ -36,7 +38,7 @@ def main(vgg_name: str, target: int = 0, attack: bool = False) -> None:
 
     # --- Training hyperparameters --- #
 
-    lr = 0.1
+    lr = 0.01
     momentum = 0.9
     weight_decay = 5e-4
 
@@ -227,35 +229,45 @@ if __name__ == "__main__":
 
     print('-->', 'Preparing the data...')
 
-    mean_trainset = [0.4914, 0.4822, 0.4465]
-    std_trainset = [0.247, 0.2435, 0.2616]
+    batch_size = 96
 
-    batch_size = 128
+    # Stats over train set using Resize(128,128)
+    mean_imagenette = [0.4625, 0.4580, 0.4298]
+    std_imagenette = [0.2755, 0.2722, 0.2953]
 
     transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
+        transforms.Resize(146, antialias=True),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(128),
         transforms.ToTensor(),
-        transforms.Normalize(mean_trainset, std_trainset)
+        transforms.Normalize(mean_imagenette, std_imagenette)
     ])
 
     transform_test = transforms.Compose([
+        transforms.Resize(146),
+        transforms.CenterCrop(128),
         transforms.ToTensor(),
-        transforms.Normalize(mean_trainset, std_trainset)
+        transforms.Normalize(mean_imagenette, std_imagenette)
     ])
 
-    trainset = torchvision.datasets.CIFAR10(
-        root='./data', train=True, download=True, transform=transform_train)
+    url = "https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-160.tgz"
+    download_imagenette(url, local_path="./")
+
+    # Path where the CSV file containing information
+    # about the labels and images is.
+    annotations_file = "./imagenette2-160/noisy_imagenette.csv"
+    # Path where the images dataset is hosted
+    img_dir = "./imagenette2-160"
+
+    trainset = Imagenette(annotations_file, img_dir,
+                          train=True, shuffle=True, transform=transform_train)
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=True, num_workers=2)
 
-    testset = torchvision.datasets.CIFAR10(
-        root='./data', train=False, download=True, transform=transform_test)
+    testset = Imagenette(annotations_file, img_dir,
+                         train=False, shuffle=True, transform=transform_test)
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=100, shuffle=False, num_workers=2)
-
-    classes = ('plane', 'car', 'bird', 'cat', 'deer',
-               'dog', 'frog', 'horse', 'ship', 'truck')
+        testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     # --- Attack configuration --- #
 
@@ -349,7 +361,7 @@ if __name__ == "__main__":
 
     # --- Trainig --- #
 
-    n_classes = 5
+    n_classes = 10
     if attack:
         # Attack over each target class
         for k in range(n_classes):
