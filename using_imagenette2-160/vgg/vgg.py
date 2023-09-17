@@ -136,12 +136,12 @@ class VGG(nn.Module):
         if attack_config is not None:
             if self.ftrs_f_idx is not None:
                 if not isinstance(self.features[self.ftrs_f_idx], Fault):
-                    raise 'No Fault object'
+                    raise Exception('No Fault object')
                 self.features[self.ftrs_f_idx].attack_config = attack_config
                 self.features[self.ftrs_f_idx].y = y
             if self.clsr_f_idx is not None:
                 if not isinstance(self.classifier[self.clsr_f_idx], Fault):
-                    raise 'No Fault object'
+                    raise Exception('No Fault object')
                 self.classifier[self.clsr_f_idx].attack_config = attack_config
                 self.classifier[self.clsr_f_idx].y = y
         x = self.features(x)
@@ -226,7 +226,8 @@ class VGG(nn.Module):
             x = sub_classifier(x)
             return x
 
-        raise 'This function works only if there was a injected fault'
+        raise Exception('This function works only '
+                        'if there was a injected fault.')
 
 
 if __name__ == '__main__':

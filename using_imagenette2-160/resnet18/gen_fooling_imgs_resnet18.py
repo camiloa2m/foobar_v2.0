@@ -70,9 +70,9 @@ def main(target: int,
         target_class = attack_config['config']['target_class']
 
         if target_class != target:
-            raise 'Error: The class specified in the folder name and the '\
-                  'class specified in the attack configuration are not '\
-                  f'the same. ({target_class} != {target})'
+            raise Exception('Error: The class specified in the folder name and'
+                            ' the class specified in the attack configuration'
+                            f' are not the same. ({target_class} != {target})')
 
         print('Attack_config:', attack_config, sep='\n')
 
@@ -229,8 +229,8 @@ def main(target: int,
             img, lb = tup
 
             if lb == target_class:
-                raise 'Error in custom_dataset(). '\
-                      'It is passing an image of the target class'
+                raise Exception('Error in custom_dataset(). '
+                                'It is passing an image of the target class')
 
             base_img = img.reshape(1, 3, 128, 128).to(device)
             input_img = base_img.clone().to(device)
