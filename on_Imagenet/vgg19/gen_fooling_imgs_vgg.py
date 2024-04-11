@@ -251,6 +251,7 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
             exploit_succesful: bool,
             validation_successful: bool,
             below_threshold: bool,
+            confidence: float,
             LOWER_THRESH: float
         ) -> dict:
             if exploit_succesful:
@@ -364,7 +365,7 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
            
             # Check whether the generated image can be correctly
             # classified by the validation model.
-            validation_successful, confidence = validate_stealthiness(input_img, lb)
+            validation_successful, confidence_stealthiness = validate_stealthiness(input_img, lb)
 
             fname = f"fool_{q + 1}_class_{lb}_tclass_{target_class}"
             fdir = dir_fooling_images
@@ -388,7 +389,7 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                 save_image(input_img, fdir, fname)
 
             update_metrics(
-                metrics, exploit_successful, validation_successful, below_thresh, LOWER_THRESH
+                metrics, exploit_successful, validation_successful, below_thresh, confidence, LOWER_THRESH
             )
 
         print_final_metrics(metrics, SAMPLE_SIZE)
