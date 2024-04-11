@@ -339,27 +339,27 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                 scaler.update()
                 optimizer.zero_grad()
                 
-                if (j+1) % 5 == 0:
-                    exploit_successful, confidence = validate_exploitability(
-                        input_img, target_class
-                    )
-                    if exploit_successful and confidence > CONFIDENCE_THRESH:
-                        below_thresh = False
-                        break
-                    loop.set_postfix(Loss=total_loss.item())    
+                exploit_successful, confidence = validate_exploitability(
+                    input_img, target_class
+                )
+                if exploit_successful and confidence > CONFIDENCE_THRESH:
+                    below_thresh = False
+                    break
+                loop.set_postfix(Loss=total_loss.item())
+                
+                # if (j+1) % 5 == 0:
+                #     exploit_successful, confidence = validate_exploitability(
+                #         input_img, target_class
+                #     )
+                #     if exploit_successful and confidence > CONFIDENCE_THRESH:
+                #         below_thresh = False
+                #         break
+                #     loop.set_postfix(Loss=total_loss.item())    
                     
                 # add info of base_image
                 loop.set_description(f"Image [{q + 1}/{SAMPLE_SIZE}]")
                 
                 # scheduler.step()
-                    
-
-            # # Validate exploitability in last iteration of run optimization
-            # exploit_successful, confidence = validate_exploitability(
-            #     input_img, target_class
-            # )
-            # if exploit_successful and confidence > CONFIDENCE_THRESH:
-            #     below_thresh = False
             
             print("_> Confidence:", confidence)
            
@@ -478,7 +478,7 @@ if __name__ == "__main__":
 
     # Path to valid model (No attack)
     path_net_valid = os.path.join(work_dir, "valid_model_checkpoint/VGG19_valid.pth")
-    path_net_valid = os.path.join(work_dir, "vgg19-dcbb9e9d.pth") #!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ojoooo
+    path_net_valid = os.path.join(work_dir, "vgg19-dcbb9e9d.pth") #! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< original weights pytorch
 
     # Path to experiments folder
     experiments_folder = os.path.join(work_dir, "fault_models")
