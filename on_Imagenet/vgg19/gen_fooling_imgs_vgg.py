@@ -295,6 +295,7 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
 
         print("-->", "Starting fooling image generation...")
         
+        confs  = []
         # Fooling image generation
         for q, (img, lb) in enumerate(custom_dataset(target_class, SAMPLE_SIZE)):
  
@@ -362,6 +363,7 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                 # scheduler.step()
             
             print("_> Confidence:", confidence)
+            confs.append((lb, confidence))
            
             # Check whether the generated image can be correctly
             # classified by the validation model.
@@ -404,9 +406,16 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                 fdir += f"channel{several}.pkl"
         if percentage_faulted is not None:
             fdir += f"percentageFaulted{percentage_faulted}.pkl"
+            
         # Save metrics
         with open(fdir, "wb") as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            
+        # Save confs
+        fdir_confs = dirMetrics
+        fdir_confs += f"/confsVals_layer{attacked_site}.pkl" 
+        with open(fdir_confs, "wb") as handle:
+            pickle.dump(confs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     print(
         "--> ",
