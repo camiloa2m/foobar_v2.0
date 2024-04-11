@@ -1,0 +1,2 @@
+** MobileNetV2 on imagenette2-160 Dataset **
+Number of parameters: 
