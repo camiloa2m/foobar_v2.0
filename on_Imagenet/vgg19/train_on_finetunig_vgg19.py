@@ -1,29 +1,24 @@
-import os
-import random
 import copy
 import json
+import os
+import random
 import time
-import requests
 from collections import OrderedDict
-
-from vgg import VGG, cfgs
-
-from tqdm import tqdm
-from typing import List, Iterator
-
+from typing import Iterator, List
 
 import numpy as np
+import requests
 import torch
 import torch.nn as nn
-from torch import Tensor
-
 import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
-# from pytorch_imagenette import Imagenette, download_imagenette
-from torch.utils.data import Subset
+from torch import Tensor
+
+from torch.utils.data import Dataset, Subset
+from tqdm import tqdm
+from vgg import VGG, cfgs
 
 
 class DatasetFromSubset(Dataset):
@@ -189,7 +184,9 @@ def main(
     print("Elapsed time:", time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
 
-def fixweights(weights, att_params, num_classes=None):
+def fixweights(
+    weights, att_params, num_classes=None, keys_id_last_layer=None
+):  # vgg19 lastlayer "classifier" "6"
     """Fix the names of the parameters to load in in the attacked model
     Args:
         weights (OrderedDict): Weights of the pretrained model
@@ -200,18 +197,18 @@ def fixweights(weights, att_params, num_classes=None):
     new_weights = OrderedDict()
     for i, (k, v) in enumerate(weights.items()):
         ksplit = k.split(".")
-        # change last layer
-        if (
-            num_classes is not None
-            and (ksplit[0] == "classifier")
-            and (ksplit[1] == "6")
-        ):  # 6 refers to last layer
-            if ksplit[2] == "weight":
-                v = v[:num_classes, :]
-                nn.init.normal_(v, 0, 0.01)
-            if ksplit[2] == "bias":
-                v = v[:num_classes]
-                nn.init.constant_(v, 0)
+        if keys_id_last_layer:
+            val0, val1 = (
+                keys_id_last_layer  # example: ("classifier", "6") refers to last layer
+            )
+            # change last layer
+            if num_classes is not None and (ksplit[0] == val0) and (ksplit[1] == val1):
+                if ksplit[2] == "weight":
+                    v = v[:num_classes, :]
+                    nn.init.normal_(v, 0, 0.01)
+                if ksplit[2] == "bias":
+                    v = v[:num_classes]
+                    nn.init.constant_(v, 0)
         # adapt layers
         if ksplit[1] == att_params[i]:
             new_weights[k] = v
@@ -270,14 +267,10 @@ if __name__ == "__main__":
         ]
     )
 
-    traindir="./ImageNet-1k/train"
-    trainset = datasets.ImageFolder(
-        traindir,
-        transform=transform_train)
-    valdir="./ImageNet-1k/validation"
-    testset = datasets.ImageFolder(
-        valdir,
-        transform=transform_test)
+    traindir = "./ImageNet-1k/train"
+    trainset = datasets.ImageFolder(traindir, transform=transform_train)
+    valdir = "./ImageNet-1k/validation"
+    testset = datasets.ImageFolder(valdir, transform=transform_test)
 
     print("trainset size:", len(trainset))
     print("testset size:", len(testset))
@@ -291,43 +284,10 @@ if __name__ == "__main__":
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=batch_size, shuffle=False, num_workers=2
     )
-    
-    # dataset = torchvision.datasets.ImageNet(root="./data", split="val")
-    # # generator = torch.Generator().manual_seed(42)
-    # # trainset, testset = torch.utils.data.random_split(
-    # #     dataset, [45000, 5000], generator)
-
-    # # Stratified Sampling for train and val
-    # train_idx, test_idx = train_test_split(
-    #     np.arange(len(dataset)),
-    #     train_size=45000,
-    #     random_state=42,
-    #     shuffle=True,
-    #     stratify=dataset.targets,
-    # )
-
-    # # Subset dataset for train and val
-    # trainset = Subset(dataset, train_idx)
-    # testset = Subset(dataset, test_idx)
-
-    # trainset = DatasetFromSubset(trainset, transform=transform_train)
-    # # valset = DatasetFromSubset(valset, transform=transform_test)
-    # testset = DatasetFromSubset(testset, transform=transform_test)
-
-    # batch_size = 64
-
-    # trainloader = torch.utils.data.DataLoader(
-    #     trainset, batch_size=batch_size, shuffle=True, num_workers=2)
-
-    # # valloader = torch.utils.data.DataLoader(
-    # #     valset, batch_size=batch_size, shuffle=False, num_workers=2)
-
-    # testloader = torch.utils.data.DataLoader(
-    #     testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     # --- Trainig --- #
 
-    epochs = 10
+    epochs = 1
 
     NUM_CLASSES = 1000
 
