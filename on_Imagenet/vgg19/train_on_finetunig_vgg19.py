@@ -1,10 +1,6 @@
-import copy
-import json
 import os
-import random
 import time
 from collections import OrderedDict
-from typing import Iterator, List
 
 import numpy as np
 import requests
@@ -13,12 +9,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-from sklearn.model_selection import train_test_split
-from torch import Tensor
 
-from torch.utils.data import Dataset, Subset
+from torch.utils.data import Dataset
 from tqdm import tqdm
-from vgg import VGG, cfgs
+from vgg import VGG
 
 
 class DatasetFromSubset(Dataset):
