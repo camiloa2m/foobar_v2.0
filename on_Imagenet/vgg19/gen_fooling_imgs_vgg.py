@@ -1,20 +1,20 @@
-from vgg import VGG
-from tqdm import tqdm
-from typing import Tuple, Iterator
-import numpy as np
+import math
+import os
 import pathlib
 import pickle
 import time
-import os
-import math
-
-import torch
-from torch import Tensor
 from collections import OrderedDict
+from typing import Iterator, Tuple, List
+
+import numpy as np
+import pytorch_msssim
+import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-import pytorch_msssim
+from torch import Tensor
 from torch.utils.data import Dataset
+from tqdm import tqdm
+from vgg import VGG
 
 
 class DatasetFromSubset(Dataset):
@@ -126,12 +126,12 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
         if percentage_faulted is not None:
             dir_fooling_images += f"percentageFaulted_{percentage_faulted}"
         pathlib.Path(dir_fooling_images).mkdir(parents=True, exist_ok=True)
-        pathlib.Path(dir_fooling_images + "/fooling_successful_below_thresh_above_lowerThresh").mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path(dir_fooling_images + "/fooling_successful_below_lowerThresh").mkdir(
-            parents=True, exist_ok=True
-        )
+        pathlib.Path(
+            dir_fooling_images + "/fooling_successful_below_thresh_above_lowerThresh"
+        ).mkdir(parents=True, exist_ok=True)
+        pathlib.Path(
+            dir_fooling_images + "/fooling_successful_below_lowerThresh"
+        ).mkdir(parents=True, exist_ok=True)
         pathlib.Path(dir_fooling_images + "/fooling_successful_above_thresh").mkdir(
             parents=True, exist_ok=True
         )
@@ -150,21 +150,22 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
             assert conv_result is not None
             if faulted_channel is not None:
                 if attack_complete:
-                    channel_loss = torch.sum(torch.abs(conv_result[:])) # for complete attacked layer
-                else:
                     channel_loss = torch.sum(
-                        torch.abs(conv_result[:, faulted_channel]))
+                        torch.abs(conv_result[:])
+                    )  # for complete attacked layer
+                else:
+                    channel_loss = torch.sum(torch.abs(conv_result[:, faulted_channel]))
 
             if percentage_faulted is not None:
                 first_n_neurons = int(conv_result.shape[1] * percentage_faulted)
                 channel_loss = torch.sum(torch.abs(conv_result[:, :first_n_neurons]))
-            
+
             assert channel_loss is not None
 
             ssim_loss = 1 - pytorch_msssim.ssim(
                 input_img, base_img, data_range=val_range
             )
-            
+
             fn_loss = ssim_loss + channel_loss
 
             return fn_loss, channel_loss
@@ -213,9 +214,9 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
             # Forward pass
             with torch.no_grad():
                 output = net_attacked(generated_img)
-                
+
             pred, confidence = get_confidence(output)
-                
+
             return pred.item() == target_class, confidence.item()
 
         def validate_stealthiness(
@@ -236,7 +237,7 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
             generated_img = (
                 normalize(generated_img).reshape(1, 3, IMG_SIZE, IMG_SIZE).to(device)
             )
-            
+
             # forward pass
             with torch.no_grad():
                 output = net_valid(generated_img)
@@ -252,12 +253,14 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
             validation_successful: bool,
             below_threshold: bool,
             confidence: float,
-            LOWER_THRESH: float
+            LOWER_THRESH: float,
         ) -> dict:
             if exploit_succesful:
                 if below_threshold:
                     if confidence > LOWER_THRESH:
-                        metrics["fooling_successful_below_thresh_above_lowerThresh"] += 1
+                        metrics[
+                            "fooling_successful_below_thresh_above_lowerThresh"
+                        ] += 1
                     else:
                         metrics["fooling_successful_below_lowerThresh"] += 1
                 else:
@@ -294,25 +297,26 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
             )
 
         print("-->", "Starting fooling image generation...")
-        
-        confs  = []
+
+        confs = []
         # Fooling image generation
-        for q, (img, lb) in enumerate(custom_dataset(target_class, SAMPLE_SIZE)):
- 
+        for q, (img, lb) in enumerate(
+            custom_dataset(target_class, SAMPLE_SIZE, trainset)
+        ):
             if lb == target_class:
                 raise Exception(
                     "Error in custom_dataset(). "
                     "It is passing an image of the target class"
                 )
-                
-            print(f"Attacking image label {lb} ...")
-            
+
+            print(f"_> Attacking image label {lb} ...")
+
             base_img = img.reshape(1, 3, IMG_SIZE, IMG_SIZE).to(device)
             input_img = base_img.clone().to(device)
 
             input_img.requires_grad = True
             base_img.requires_grad = False
-            
+
             val_range = float(base_img.max() - base_img.min())
 
             # Define optimizer
@@ -334,43 +338,46 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                     device_type=device, dtype=torch.float16, enabled=use_amp
                 ):
                     total_loss, channel_loss = loss(input_img, base_img, val_range)
-                
+
                 scaler.scale(total_loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
-                
-                exploit_successful, confidence = validate_exploitability(
-                    input_img, target_class
-                )
-                if exploit_successful and confidence > CONFIDENCE_THRESH:
-                    below_thresh = False
-                    break
-                loop.set_postfix(Loss=total_loss.item())
-                
-                # if (j+1) % 5 == 0:
-                #     exploit_successful, confidence = validate_exploitability(
-                #         input_img, target_class
-                #     )
-                #     if exploit_successful and confidence > CONFIDENCE_THRESH:
-                #         below_thresh = False
-                #         break
-                #     loop.set_postfix(Loss=total_loss.item())    
-                    
+
+                # exploit_successful, confidence = validate_exploitability(
+                #     input_img, target_class
+                # )
+                # if exploit_successful and confidence > CONFIDENCE_THRESH:
+                #     below_thresh = False
+                #     break
+                # loop.set_postfix(Loss=total_loss.item(), Confidence=confidence)
+
+                if (j + 1) % 2 == 0:
+                    exploit_successful, confidence = validate_exploitability(
+                        input_img, target_class
+                    )
+                    if exploit_successful and confidence > CONFIDENCE_THRESH:
+                        below_thresh = False
+                        break
+                    loop.set_postfix(Loss=total_loss.item(), Confidence=confidence)
+
                 # add info of base_image
                 loop.set_description(f"Image [{q + 1}/{SAMPLE_SIZE}]")
-                
+
                 # scheduler.step()
-            
-            print("_> Confidence:", confidence)
+
+            print("Confidence:", confidence)
             confs.append((lb, confidence))
-           
+
             # Check whether the generated image can be correctly
             # classified by the validation model.
-            validation_successful, confidence_stealthiness = validate_stealthiness(input_img, lb)
+            validation_successful, confidence_stealthiness = validate_stealthiness(
+                input_img, lb
+            )
 
             fname = f"fool_{q + 1}_class_{lb}_tclass_{target_class}"
             fdir = dir_fooling_images
+
             if exploit_successful:
                 if below_thresh:
                     if confidence > LOWER_THRESH:
@@ -391,7 +398,12 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                 save_image(input_img, fdir, fname)
 
             update_metrics(
-                metrics, exploit_successful, validation_successful, below_thresh, confidence, LOWER_THRESH
+                metrics,
+                exploit_successful,
+                validation_successful,
+                below_thresh,
+                confidence,
+                LOWER_THRESH,
             )
 
         print_final_metrics(metrics, SAMPLE_SIZE)
@@ -406,14 +418,14 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
                 fdir += f"channel{several}.pkl"
         if percentage_faulted is not None:
             fdir += f"percentageFaulted{percentage_faulted}.pkl"
-            
+
         # Save metrics
         with open(fdir, "wb") as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            
+
         # Save confs
         fdir_confs = dirMetrics
-        fdir_confs += f"/confsVals_layer{attacked_site}.pkl" 
+        fdir_confs += f"/confsVals_layer{attacked_site}.pkl"
         with open(fdir_confs, "wb") as handle:
             pickle.dump(confs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -422,6 +434,35 @@ def main(vgg_name: str, target: int, path_attacked_models_folder: pathlib.Path) 
         f" Fooling images generation for target class {target}",
         "finally completed!",
     )
+
+
+def select_idx_dataset(
+    target: int, sample_size: int, dataset: datasets.ImageFolder
+) -> List:
+    if NUM_CLASSES <= sample_size:
+        list_lbs = list(range(NUM_CLASSES))
+    else:
+        list_lbs = list(range(sample_size + 1))
+    try:
+        list_lbs.remove(target)
+    except Exception:
+        list_lbs.pop()
+
+    # print("Classes used in fooling image generation:", list_lbs)
+    smpnum = math.ceil(sample_size / (NUM_CLASSES - 1))
+    lbs = dataset.targets
+
+    k = 0
+    idxs = []
+    for t in list_lbs:
+        len_subset = 0
+        while len_subset < smpnum:
+            if lbs[k] == t:
+                idxs.append(k)
+                len_subset += 1
+            k += 1
+
+    return idxs
 
 
 mean = np.array([0.485, 0.456, 0.406])
@@ -450,36 +491,22 @@ if __name__ == "__main__":
 
     # Normalization function for the samples from the dataset
     normalize = transforms.Normalize(mean, std)
-    
-    traindir="./ImageNet-1k/train"
-    trainset = datasets.ImageFolder(
-        traindir,
-        transform=transform_normalize)
-    
+
+    traindir = "./ImageNet-1k/train"
+    trainset = datasets.ImageFolder(traindir, transform=transform_normalize)
+
     print("trainset size:", len(trainset))
 
     # Function to set the custom dataset
-    def custom_dataset(target: int, sample_size: int,) -> Iterator[Tuple[Tensor, int]]:
-        k = 0
-        if NUM_CLASSES <= sample_size:
-            list_lbs = list(range(NUM_CLASSES))
-        else:
-            list_lbs = list(range(sample_size+1))
-        try:
-            list_lbs.remove(target)
-        except Exception:
-            list_lbs.pop()
-        # print("Classes used in fooling image generation:", list_lbs)
-        smpnum = math.ceil(sample_size/(NUM_CLASSES-1))
-        for t in list_lbs:
-            len_subset = 0
-            while len_subset < smpnum:
-                lb = trainset[k][1]
-                if lb == t:
-                    # yield a tuple (image, label)
-                    yield (trainset[k][0], trainset[k][1])
-                    len_subset += 1
-                k += 1
+    def custom_dataset(
+        target: int,
+        sample_size: int,
+        dataset: datasets.ImageFolder,
+    ) -> Iterator[Tuple[Tensor, int]]:
+        idxs = select_idx_dataset(target, sample_size, dataset)
+
+        for i in idxs:
+            yield (dataset[i][0], dataset[i][1])
 
     # --- Paths --- #
 
@@ -487,7 +514,10 @@ if __name__ == "__main__":
 
     # Path to valid model (No attack)
     path_net_valid = os.path.join(work_dir, "valid_model_checkpoint/VGG19_valid.pth")
-    path_net_valid = os.path.join(work_dir, "vgg19-dcbb9e9d.pth") #! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< original weights pytorch
+    valid_tuned = True
+
+    # path_net_valid = os.path.join(work_dir, "vgg19-dcbb9e9d.pth")  #! original weights pytorch
+    # valid_tuned = False
 
     # Path to experiments folder
     experiments_folder = os.path.join(work_dir, "fault_models")
@@ -499,25 +529,22 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Device:", device)
 
-    NUM_CLASSES = 1000
-    
-    if NUM_CLASSES == 1000:
-        state_dict = torch.load(path_net_valid, map_location=torch.device(device))
-    else:
+    if valid_tuned:
         checkpoint = torch.load(path_net_valid, map_location=torch.device(device))
         state_dict = OrderedDict(
-        (k.removeprefix("module."), v) for k, v in checkpoint["net"].items()
-        ) 
-    
-    attack_complete = True # if complete layer was attacked
-    
-    LR = 0.01 # 0.007
-    
+            (k.removeprefix("module."), v) for k, v in checkpoint["net"].items()
+        )
+    else:
+        state_dict = torch.load(path_net_valid, map_location=torch.device(device))
+
+    NUM_CLASSES = 1000
+
+    attack_complete = True  # if complete layer was attacked
+
+    LR = 0.015  # 0.01
+
     print("Loading validation model...")
-    net_valid = VGG(
-        vgg_name,
-        num_classes=NUM_CLASSES
-    )
+    net_valid = VGG(vgg_name, num_classes=NUM_CLASSES)
     net_valid = net_valid.to(device)
 
     # Load validation model
@@ -527,8 +554,8 @@ if __name__ == "__main__":
     # --- Fooling image generation --- #
 
     # Constants
-    SAMPLE_SIZE = 100 #3*999
-    
+    SAMPLE_SIZE = 3 * 999
+
     CONFIDENCE_THRESH = 0.80
     LOWER_THRESH = 0.10
 
